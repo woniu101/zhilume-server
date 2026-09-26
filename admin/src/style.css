@@ -305,3 +305,5 @@ td small {
     padding: 13px;
   }
 }
+
+.job-error { color: var(--danger); white-space: normal; overflow-wrap: anywhere; max-width: 460px; }

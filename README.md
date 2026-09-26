@@ -1,12 +1,14 @@
 # Zhilume Server
 
-独立服务、Web 管理台与 Windows 启动器。当前 0.4.0 初版，配套 Studio 0.5.0 / Worker 0.3.0。支持图片任务调度、CPU 媒体处理和模拟能力；真实 Qwen GPU 推理尚未验收。
+独立服务、Web 管理台与 Windows 启动器。当前 0.5.0 初版，配套 Studio 0.7.0 / Worker 0.4.0。支持图片任务调度、CPU 媒体处理和模拟能力；真实 Qwen GPU 推理尚未验收。
 
 - `/api/v1/image-models` 返回 Qwen 2512 / 2.1 目录及在线执行配置；未显式启用图片 Worker 时不能提交 GPU 任务。
 - 调度按模型、配置指纹、工作流版本和操作匹配，保留多图顺序与结果 provenance。
 - 契约源在 `contracts/operation-catalog.json`；修改后同步两端：`npm run contracts:export -- ../zhilume-worker/src/zhilume_worker/contracts ../zhilume-studio/src/contracts`。
 - 不为旧开发版保留兼容层；三端需配套升级。旧 zhihua 项目仅作能力参考。
 - API、执行配置与证据边界见 [协议](docs/protocol.md) 和 [开发记录](docs/development-status.md)。
+
+新增画布生成草稿校验；管理台展示执行端忙碌/排空/心跳诊断、当前任务，以及直接可见的错误信息。系统接口与管理台版本取自 package.json。
 
 ## 本地开发
 

@@ -1,3 +1,5 @@
+import metadata from "../../package.json";
+import catalog from "../../contracts/operation-catalog.json";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -155,7 +157,7 @@ function App() {
               <div className="local-tag">
                 <Server size={17} />
                 <div>
-                  Zhilume Server<small>v0.2.2 · 协议 1.0</small>
+                  Zhilume Server<small>v{metadata.version} · 协议 1.0</small>
                 </div>
               </div>
               <div className="row spread">
@@ -491,13 +493,16 @@ function WorkerTable({
                     ? "已停用"
                     : w.draining
                       ? "排空中"
-                      : w.connected
+                      : w.state === "busy"
+                        ? "忙碌" : w.state === "ready"
                         ? "在线"
                         : "离线"}
                 </span>
               </td>
               <td>
                 {w.platform}
+                <small>{w.reason}</small>
+                {(w.activeJobs || []).map((j: any) => <small key={j.id}>任务 {j.id.slice(0, 8)} · {j.stage}</small>)}
                 <small>{w.capabilities.length} 项执行能力</small>
                 {(w.imageProfiles || []).map((p: any) => <small key={p.profileId}>{p.modelId} · {p.profileId.slice(0, 8)} · GPU 待验收</small>)}
               </td>
@@ -505,6 +510,7 @@ function WorkerTable({
                 {w.lastHeartbeat
                   ? new Date(w.lastHeartbeat).toLocaleTimeString()
                   : "尚未握手"}
+                {w.heartbeatAgeSeconds !== null && <small>{w.heartbeatAgeSeconds} 秒前</small>}
               </td>
               <td>
                 <div className="row">
@@ -560,9 +566,7 @@ function JobTable({
             <tr key={j.id}>
               <td>
                 <strong>
-                  {j.operation === "mock.text.echo.v1"
-                    ? "文本回显"
-                    : "素材复制"}
+                  {[...catalog.imageOperations, ...catalog.media].find(op => op.id === j.operation)?.name || (j.operation === "mock.text.echo.v1" ? "文本回显" : j.operation === "mock.media.copy.v1" ? "素材复制" : j.operation)}
                 </strong>
                 <small>{j.id.slice(0, 8)} · {j.simulation ? "模拟" : j.operation.startsWith("image.") ? "GPU 图片" : "CPU 处理"}</small>
               </td>
@@ -578,6 +582,8 @@ function JobTable({
                   ? `${Math.round(j.progress * 100)}% · `
                   : ""}
                 {j.stage}
+                {j.error && <small className="job-error">{j.error}</small>}
+                {j.workerId && <small>执行端 {j.workerId.slice(0, 8)} · 尝试 {j.attemptId?.slice(0, 8)}</small>}
               </td>
               <td>
                 {["failed", "interrupted"].includes(j.status) ? (

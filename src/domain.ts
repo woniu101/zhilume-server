@@ -1,3 +1,4 @@
+import { validateGenerationDraft } from "./generation-draft.js";
 import { randomUUID } from "node:crypto";
 export const id = () => randomUUID();
 export const now = () => new Date().toISOString();
@@ -82,6 +83,9 @@ export function validateCanvas(doc: any) {
         (typeof node.data.text !== "string" || node.data.text.length > 12000))
     )
       throw new AppError("invalid_node_content", "节点标题或文本超过允许长度");
+    if (node.data.generationDraft !== undefined) validateGenerationDraft(node.data.generationDraft);
+    if (node.data.textDraft !== undefined && (typeof node.data.textDraft !== "string" || node.data.textDraft.length > 12000))
+      throw new AppError("invalid_node_content", "文本草稿超过允许长度");
     nodeIds.add(node.id);
   }
   const children = new Map<string, string[]>();

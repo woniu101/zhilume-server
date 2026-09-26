@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { workerStatus } from "./worker-status.js";
 import { Store } from "./store.js";
 import { Assets } from "./assets.js";
 import {
@@ -182,7 +183,7 @@ export async function createApp(options: Options) {
   });
   app.get("/api/v1/system", async () => ({
     name: "Zhilume Server",
-    version: "0.2.2",
+    version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version,
     protocolVersion: "1.0",
     authentication: true,
   }));
@@ -603,7 +604,7 @@ export async function createApp(options: Options) {
   });
   app.get("/api/v1/workers", async (req) => {
     owner(req);
-    return store.all("worker").map(({ tokenHash, ...w }) => w);
+    return store.all("worker").map(({ tokenHash, ...w }) => ({ ...w, ...workerStatus(w, store.all("job")) }));
   });
   app.post("/api/v1/enrollments", async (req) => {
     owner(req);
