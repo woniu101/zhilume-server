@@ -33,4 +33,3 @@ export function validateProvenance(raw: unknown, lookup: (id: string) => any) {
 }
 
 // Planned models are deliberately separate from executable Worker capabilities.
-export const imageModels = catalog.imageModels;

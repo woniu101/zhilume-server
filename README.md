@@ -1,19 +1,12 @@
 # Zhilume Server
 
-当前 0.3.0 初版，配套 Studio 0.4.0 / Worker 0.2.0。新增 CPU 视频截取、抽音轨、媒体来源记录和 Qwen 模型规划目录。
+独立服务、Web 管理台与 Windows 启动器。当前 0.4.0 初版，配套 Studio 0.5.0 / Worker 0.3.0。支持图片任务调度、CPU 媒体处理和模拟能力；真实 Qwen GPU 推理尚未验收。
 
-- `GET /api/v1/capabilities` 只列出执行能力，`ready` 根据在线 Worker 匹配。
-- `GET /api/v1/image-models` 单独返回 Qwen 2512 / 2.1 规划信息；待 GPU 验证，不可提交为执行任务。
-- 媒体能力和模型规划的源文件为 `contracts/operation-catalog.json`；修改后运行 `npm run contracts:export -- ../zhilume-worker/src/zhilume_worker/contracts`。
-- 任务输入含不可变资产 ID、开始/结束秒数，输出归档后保存来源与参数；普通上传也接受经验证的 `X-Asset-Provenance`。
-- 不为旧开发版保留兼容层。旧 zhihua 项目仅作能力参考。
-
-
-织镜的独立服务、Web 管理台与 Windows 启动器。当前为 **0.2.2 开发版**，真实模型尚未接入。
-
-0.2.2：应用图标保留 Z 主体，增加青灰双层服务器角标，与 Studio 的雾蓝笔尖区分；窗口、托盘、EXE 使用统一资源。
-
-0.2.1 修复 Electron Studio 跨域保存：CORS 显式允许 PUT/PATCH/DELETE 等实际使用的方法。更新后需停止并重新启动 Server 服务进程；只更新 Studio 不能修复旧 Server 的预检错误。
+- `/api/v1/image-models` 返回 Qwen 2512 / 2.1 目录及在线执行配置；未显式启用图片 Worker 时不能提交 GPU 任务。
+- 调度按模型、配置指纹、工作流版本和操作匹配，保留多图顺序与结果 provenance。
+- 契约源在 `contracts/operation-catalog.json`；修改后同步两端：`npm run contracts:export -- ../zhilume-worker/src/zhilume_worker/contracts ../zhilume-studio/src/contracts`。
+- 不为旧开发版保留兼容层；三端需配套升级。旧 zhihua 项目仅作能力参考。
+- API、执行配置与证据边界见 [协议](docs/protocol.md) 和 [开发记录](docs/development-status.md)。
 
 ## 本地开发
 

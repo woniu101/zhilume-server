@@ -300,7 +300,7 @@ function App() {
                 <section className="admin-card">
                   <div className="card-heading">
                     <h2>最近 200 个任务</h2>
-                    <span className="badge">CPU 处理 / 模拟能力</span>
+                    <span className="badge">GPU 图片 / CPU 处理 / 模拟</span>
                   </div>
                   <JobTable
                     jobs={jobs}
@@ -499,6 +499,7 @@ function WorkerTable({
               <td>
                 {w.platform}
                 <small>{w.capabilities.length} 项执行能力</small>
+                {(w.imageProfiles || []).map((p: any) => <small key={p.profileId}>{p.modelId} · {p.profileId.slice(0, 8)} · GPU 待验收</small>)}
               </td>
               <td>
                 {w.lastHeartbeat
@@ -541,7 +542,7 @@ function JobTable({
   fail: (s: string) => void;
 }) {
   if (!jobs.length)
-    return <Empty text="暂无任务。在 Studio 选择节点，运行一次模拟任务。" />;
+    return <Empty text="暂无任务。在 Studio 选择节点，提交创作或媒体处理任务。" />;
   return (
     <div className="table-scroll">
       <table>
@@ -563,7 +564,7 @@ function JobTable({
                     ? "文本回显"
                     : "素材复制"}
                 </strong>
-                <small>{j.id.slice(0, 8)} · {j.simulation ? "模拟" : "CPU 处理"}</small>
+                <small>{j.id.slice(0, 8)} · {j.simulation ? "模拟" : j.operation.startsWith("image.") ? "GPU 图片" : "CPU 处理"}</small>
               </td>
               <td>
                 {projects.find((p) => p.id === j.projectId)?.name ||

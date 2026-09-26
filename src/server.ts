@@ -22,8 +22,9 @@ import {
   requireValue,
   validateCanvas,
 } from "./domain.js";
-import { mediaCapabilities, validateMediaInput, validateProvenance, imageModels } from "./media-operations.js";
-const executableCapabilities = [...capabilities, ...mediaCapabilities];
+import { mediaCapabilities, validateMediaInput, validateProvenance } from "./media-operations.js";
+import { imageCapabilities, isImageOperation, modelAvailability, validateImageInput, validateImageProfiles, supportsImageJob } from "./image-operations.js";
+const executableCapabilities = [...capabilities, ...mediaCapabilities, ...imageCapabilities];
 const executableOperations = executableCapabilities.map(c => c.id);
 import type { WebSocket } from "ws";
 
@@ -457,7 +458,7 @@ export async function createApp(options: Options) {
         ),
     }));
   });
-  app.get("/api/v1/image-models", async (req) => { owner(req); return imageModels; });
+  app.get("/api/v1/image-models", async (req) => { owner(req); return modelAvailability(store.all("worker")); });
   app.get("/api/v1/jobs", async (req: any) => {
     owner(req);
     return store
@@ -509,7 +510,9 @@ export async function createApp(options: Options) {
       : null;
     if (b.nodeId && !node)
       throw new AppError("node_missing", "请先保存画布节点");
-    const input = b.operation.startsWith("media.")
+    const input = isImageOperation(b.operation)
+      ? validateImageInput(b.operation, b.input, store.all("worker"), id => store.get("asset", id))
+      : b.operation.startsWith("media.")
       ? validateMediaInput(b.operation, b.input, requireValue(store.get("asset", b.input?.assetId), "输入素材不存在"))
       : b.operation === operations[0]
         ? { text: text(b.input?.text) }
@@ -574,6 +577,7 @@ export async function createApp(options: Options) {
     getProject(j.projectId, true);
     if (!["failed", "interrupted"].includes(j.status))
       throw new AppError("retry_not_allowed", "仅失败或中断任务可以重试", 409);
+    if (isImageOperation(j.operation)) validateImageInput(j.operation, j.input, store.all("worker"), id => store.get("asset", id));
     j.attempts.push({
       attemptId: j.attemptId,
       status: j.status,
@@ -646,11 +650,13 @@ export async function createApp(options: Options) {
     emit("worker.changed");
     return { id: w.id };
   });
-  app.get("/api/v1/worker/jobs/:id/input", async (req: any, reply) => {
+  app.get("/api/v1/worker/jobs/:id/inputs/:assetId", async (req: any, reply) => {
     const j = requireValue(store.get("job", req.params.id));
     assertAttempt(req, j);
+    const allowed = j.input.referenceAssetIds || [j.input.assetId];
+    if (!allowed.includes(req.params.assetId)) throw new AppError("input_forbidden", "素材不属于此任务", 403);
     return assets.serve(
-      requireValue(store.get("asset", j.input.assetId)),
+      requireValue(store.get("asset", req.params.assetId)),
       req,
       reply,
     );
@@ -668,7 +674,7 @@ export async function createApp(options: Options) {
         workerId: j.workerId,
         attemptId: j.attemptId,
         jobId: j.id,
-        provenance: j.input.assetId ? { operation: j.operation, sourceAssetIds: [j.input.assetId], parameters: { start: j.input.start, end: j.input.end } } : undefined,
+        provenance: isImageOperation(j.operation) ? { operation: j.operation, sourceAssetIds: j.input.referenceAssetIds, parameters: Object.fromEntries(Object.entries(j.input).filter(([key]) => key !== "referenceAssetIds")) } : j.input.assetId ? { operation: j.operation, sourceAssetIds: [j.input.assetId], parameters: { start: j.input.start, end: j.input.end } } : undefined,
       });
       assertAttempt(req, requireValue(store.get("job", j.id)));
       return reply.code(201).send({ id: a.id, size: a.size, sha256: a.sha256 });
@@ -739,6 +745,7 @@ export async function createApp(options: Options) {
             peers.get(w.id)?.readyState === 1 &&
             Date.now() - w.lastHeartbeat < 40000 &&
             w.capabilities.includes(job.operation) &&
+            supportsImageJob(w, job) &&
             !store
               .all("job")
               .some(
@@ -764,7 +771,9 @@ export async function createApp(options: Options) {
               requireValue(store.get("asset", job.input.assetId)),
             ),
           }
-        : job.input;
+        : isImageOperation(job.operation)
+          ? { ...job.input, referenceAssets: job.input.referenceAssetIds.map((id: string) => publicAsset(requireValue(store.get("asset", id)))) }
+          : job.input;
       send(
         worker.id,
         "task.assign",
@@ -809,13 +818,15 @@ export async function createApp(options: Options) {
             msg.payload.capabilities.some((v: any) => typeof v !== "string")
           )
             throw new AppError("invalid_capabilities", "能力声明无效");
+          const imageProfiles = validateImageProfiles(msg.payload.imageProfiles);
           welcomed = true;
           clearTimeout(handshakeTimeout);
           Object.assign(w, {
             connected: true,
             lastHeartbeat: Date.now(),
+            imageProfiles,
             capabilities: msg.payload.capabilities.filter((s: string) =>
-              executableOperations.includes(s),
+              executableOperations.includes(s) && (!isImageOperation(s) || imageProfiles.some(p => p.operations.includes(s))),
             ),
           });
           store.put("worker", w);
@@ -905,6 +916,13 @@ export async function createApp(options: Options) {
           saveJob(j);
           return;
         }
+        if (msg.type === "task.failed") {
+          j.status = "failed";
+          j.stage = "执行失败";
+          j.error = String(msg.payload.message || "执行失败").slice(0, 1000);
+          saveJob(j);
+          return;
+        }
         if (j.status === "cancel_requested") {
           send(workerId, "task.cancel", {}, j);
           return;
@@ -927,13 +945,6 @@ export async function createApp(options: Options) {
           saveJob(j);
           return;
         }
-        if (msg.type === "task.failed") {
-          j.status = "failed";
-          j.stage = "执行失败";
-          j.error = String(msg.payload.message || "执行失败").slice(0, 1000);
-          saveJob(j);
-          return;
-        }
         if (msg.type === "task.result_ready") {
           const a = requireValue(store.get("asset", msg.payload.assetId));
           if (
@@ -943,6 +954,7 @@ export async function createApp(options: Options) {
           )
             throw new AppError("invalid_output", "结果归属或校验不匹配");
           if (
+            (isImageOperation(j.operation) && (a.kind !== "image" || !a.filename.toLowerCase().endsWith(".png"))) ||
             (j.operation === "media.video.trim.v1" && a.kind !== "video") ||
             (j.operation === "media.audio.extract.v1" && a.kind !== "audio") ||
             (j.operation === operations[0] && a.kind !== "text") ||

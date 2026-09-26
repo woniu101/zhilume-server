@@ -34,7 +34,7 @@ test('real CPU worker exports media, validates ranges and persists lineage; imag
   assert.equal(invalid.statusCode, 400);
   assert.equal(invalid.json().code, 'invalid_range');
   const models = await call('/image-models');
-  assert.deepEqual(models[0].operations, ['image.generate']);
+  assert.deepEqual(models[0].operations, ['image.generate.v1']);
   assert.ok(models.every((m: any) => m.status === 'awaiting_gpu_validation'));
   const enrollment = await call('/enrollments', {});
   worker = spawn(process.env.ZHILUME_TEST_PYTHON || resolve('../zhilume-worker/.venv/' + (process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')),
