@@ -1,0 +1,68 @@
+{
+  "name": "zhilume-server",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "dev:admin": "vite --config admin/vite.config.ts --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json && tsc -p admin/tsconfig.json && vite build --config admin/vite.config.ts",
+    "start": "node dist/main.js",
+    "test": "tsx --test tests/*.test.ts",
+    "desktop": "electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "contracts:export": "node scripts/export-contracts.mjs"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/static": "^10.1.4",
+    "@fastify/websocket": "^11.0.0",
+    "ajv": "^8.17.1",
+    "fastify": "^5.12.5",
+    "lucide-react": "^0.577.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^22.19.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^6.0.0",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.0.12",
+    "png-to-ico": "^3.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.1"
+  },
+  "build": {
+    "appId": "app.zhilume.server",
+    "productName": "Zhilume Server",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "admin-dist/**",
+      "electron/**",
+      "contracts/**",
+      "package.json",
+      "assets/**"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "electronDist": "node_modules/electron/dist"
+  },
+  "description": "Zhilume project and execution server",
+  "author": "Zhilume",
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

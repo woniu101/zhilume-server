@@ -1,0 +1,194 @@
+:root {
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color-scheme: dark;
+  --bg: #141414;
+  --panel: #202020;
+  --border: #363636;
+  --text: #ededed;
+  --muted: #909090;
+  --accent: #8aaaf0;
+  --at: #172039;
+}
+body.light {
+  color-scheme: light;
+  --bg: #fafafa;
+  --panel: #fff;
+  --border: #dedede;
+  --text: #202020;
+  --muted: #777;
+  --accent: #365fb5;
+  --at: #fff;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: 22px 35px;
+}
+header > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+header strong {
+  font-size: 21px;
+}
+header small {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.symbol {
+  font-size: 36px;
+}
+main {
+  padding: 30px 36px;
+}
+.eyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+h1 {
+  font-weight: 500;
+  font-size: 27px;
+  margin: 17px 0 12px;
+}
+p {
+  color: var(--muted);
+  line-height: 1.8;
+}
+section {
+  margin: 24px 0;
+  padding: 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status code {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+#dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+#dot.online {
+  background: var(--accent);
+}
+button {
+  font: inherit;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.primary {
+  background: var(--accent);
+  color: var(--at);
+  border-color: transparent;
+}
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.buttons {
+  display: flex;
+  gap: 9px;
+  margin-top: 23px;
+  flex-wrap: wrap;
+}
+section p {
+  font-size: 13px;
+  margin: 16px 0 0;
+}
+h2 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 24px 0 12px;
+}
+pre {
+  margin: 0;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 13px;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow: auto;
+  height: 125px;
+  color: var(--muted);
+}
+.foot {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.foot code {
+  word-break: break-all;
+}
+.note {
+  font-size: 12px;
+  margin-top: 17px;
+}
+
+details {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+summary {
+  cursor: pointer;
+}
+label {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 16px;
+}
+input {
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 0;
+  flex: 1;
+}
+details p {
+  font-size: 13px;
+}
+.symbol {
+  border-radius: 10px;
+}
