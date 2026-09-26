@@ -307,3 +307,7 @@ td small {
 }
 
 .job-error { color: var(--danger); white-space: normal; overflow-wrap: anywhere; max-width: 460px; }
+
+.worker-connection-form { display: grid; gap: 16px; }
+.worker-connection-form label { display: grid; gap: 8px; }
+.worker-connection-form input { width: 100%; }

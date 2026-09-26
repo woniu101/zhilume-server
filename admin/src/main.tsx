@@ -11,8 +11,6 @@ import {
   Plus,
   RefreshCw,
   ArrowUpRight,
-  Copy,
-  Check,
   Activity,
   FolderOpen,
   LogOut,
@@ -37,10 +35,10 @@ function App() {
     [jobs, setJobs] = useState<any[]>([]),
     [assets, setAssets] = useState<any[]>([]),
     [projects, setProjects] = useState<any[]>([]),
-    [enrollment, setEnrollment] = useState<any>(null),
+    [editor, setEditor] = useState<any>(null),
+    [probe, setProbe] = useState<any>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [copied, setCopied] = useState(false),
     [reachable, setReachable] = useState(true);
   useEffect(() => {
     void restoreAdminSession()
@@ -97,9 +95,6 @@ function App() {
     ["settings", "服务设置", Settings],
   ] as const;
   const online = workers.filter((w) => w.connected && !w.disabled).length;
-  const command = enrollment
-    ? `uv run zhilume-worker --server ${location.protocol === "app:" ? "http://127.0.0.1:4310" : connection.base || location.origin} --enrollment ${enrollment.token} --name my-worker`
-    : "";
   async function changeWorker(id: string, body: any) {
     try {
       await api(`/workers/${id}`, "PATCH", body);
@@ -108,19 +103,17 @@ function App() {
       setError((e as Error).message);
     }
   }
-  async function enrollmentCreate() {
-    setBusy(true);
+  function editWorker(worker?: any) {
+    setEditor({ id: worker?.id, name: worker?.name || "", address: worker?.address || "", credential: "" }); setProbe(null);
+  }
+  async function submitWorker(testOnly: boolean) {
+    setBusy(true); setError("");
+    const body = { ...editor }; if (!body.credential && body.id) delete body.credential;
     try {
-      setEnrollment({
-        ...(await api("/enrollments", "POST")),
-        created: Date.now(),
-      });
-      setCopied(false);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+      if (testOnly) setProbe(await api("/workers/probe", "POST", body));
+      else { await api(body.id ? `/workers/${body.id}` : "/workers", body.id ? "PATCH" : "POST", body); setEditor(null); await refresh(); }
+    } catch (e) { setProbe(null); setError((e as Error).message); }
+    finally { setBusy(false); }
   }
   return (
     <>
@@ -157,7 +150,7 @@ function App() {
               <div className="local-tag">
                 <Server size={17} />
                 <div>
-                  Zhilume Server<small>v{metadata.version} · 协议 1.0</small>
+                  Zhilume Server<small>v{metadata.version} · 协议 2.0</small>
                 </div>
               </div>
               <div className="row spread">
@@ -221,7 +214,7 @@ function App() {
                   <button
                     className="primary"
                     disabled={busy}
-                    onClick={() => void enrollmentCreate()}
+                    onClick={() => editWorker()}
                   >
                     <Plus size={15} />
                     接入执行端
@@ -267,7 +260,7 @@ function App() {
                         <ArrowUpRight size={14} />
                       </button>
                     </div>
-                    <WorkerTable workers={workers} change={changeWorker} />
+                    <WorkerTable workers={workers} change={changeWorker} edit={editWorker} />
                   </section>
                   <section className="admin-card">
                     <div className="card-heading">
@@ -295,7 +288,7 @@ function App() {
                     <h2>已登记执行端 · {workers.length}</h2>
                     <span className="muted">单执行端并发：1</span>
                   </div>
-                  <WorkerTable workers={workers} change={changeWorker} />
+                  <WorkerTable workers={workers} change={changeWorker} edit={editWorker} />
                 </section>
               )}
               {page === "jobs" && (
@@ -385,31 +378,16 @@ function App() {
           </main>
         </div>
       )}
-      {enrollment && (
-        <Modal title="接入新执行端" close={() => setEnrollment(null)}>
-          <p className="prose">
-            在 Worker 仓库目录运行以下命令。接入凭证仅能使用一次，10
-            分钟内有效。已接入的 Worker 会在自己的状态目录保存独立凭证。
-          </p>
-          <div className="command-box">
-            <code>{command}</code>
-          </div>
-          <p className="prose">
-            云端 Worker 需要把 Server 地址改为可访问的 HTTPS 地址。本地的
-            127.0.0.1 地址仅适用于同一台电脑。
-          </p>
-          <button
-            className="primary"
-            onClick={() =>
-              void navigator.clipboard
-                .writeText(command)
-                .then(() => setCopied(true))
-                .catch(() => setError("复制失败，请手动选择命令"))
-            }
-          >
-            {copied ? <Check size={15} /> : <Copy size={15} />}{" "}
-            {copied ? "已复制命令" : "复制接入命令"}
-          </button>
+      {editor && (
+        <Modal title={editor.id ? "编辑执行端连接" : "接入新执行端"} close={() => { if (!busy) setEditor(null); }}>
+          <p className="prose">填写从 Server 所在机器可访问的 Worker 地址。Server 会主动连接，无需提供公网入口。</p>
+          <form className="worker-connection-form" onSubmit={e => { e.preventDefault(); void submitWorker(false); }}>
+            <label>执行端名称<input value={editor.name} placeholder="可选，默认使用 Worker 名称" onChange={e => setEditor({ ...editor, name: e.target.value })} /></label>
+            <label>Worker 地址<input required type="url" value={editor.address} placeholder="http://127.0.0.1:4320" onChange={e => { setEditor({ ...editor, address: e.target.value }); setProbe(null); }} /></label>
+            <label>接入密钥<input required={!editor.id} type="password" autoComplete="new-password" value={editor.credential} placeholder={editor.id ? "留空保留现有密钥" : "填写 Worker 提供的接入密钥"} onChange={e => { setEditor({ ...editor, credential: e.target.value }); setProbe(null); }} /></label>
+            {probe && <p className="prose" role="status">验证通过：{probe.workerName} · {probe.platform} · 协议 {probe.protocolVersion}</p>}
+            <div className="row"><button type="button" disabled={busy} onClick={() => void submitWorker(true)}>测试连接</button><button className="primary" disabled={busy} type="submit">{busy ? "正在连接…" : "保存连接"}</button></div>
+          </form>
         </Modal>
       )}
       {error && (
@@ -453,9 +431,11 @@ function Empty({ text }: { text: string }) {
 function WorkerTable({
   workers,
   change,
+  edit,
 }: {
   workers: any[];
   change: (id: string, body: any) => Promise<void>;
+  edit: (worker: any) => void;
 }) {
   if (!workers.length)
     return <Empty text="尚未接入执行端。点击“接入执行端”添加第一个 Worker。" />;
@@ -481,7 +461,7 @@ function WorkerTable({
                   </span>
                   <div>
                     <strong>{w.name}</strong>
-                    <small>{w.id.slice(0, 8)}</small>
+                    <small>{w.address || w.id.slice(0, 8)}</small>
                   </div>
                 </div>
               </td>
@@ -501,7 +481,7 @@ function WorkerTable({
               </td>
               <td>
                 {w.platform}
-                <small>{w.reason}</small>
+                <small>{w.reason}</small>{w.lastError && <small className="job-error">{w.lastError}</small>}
                 {(w.activeJobs || []).map((j: any) => <small key={j.id}>任务 {j.id.slice(0, 8)} · {j.stage}</small>)}
                 <small>{w.capabilities.length} 项执行能力</small>
                 {(w.imageProfiles || []).map((p: any) => <small key={p.profileId}>{p.modelId} · {p.profileId.slice(0, 8)} · GPU 待验收</small>)}
@@ -514,6 +494,7 @@ function WorkerTable({
               </td>
               <td>
                 <div className="row">
+                  <button className="small" onClick={() => edit(w)}>连接设置</button>
                   <button
                     className="small"
                     disabled={w.disabled}

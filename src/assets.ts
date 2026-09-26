@@ -59,6 +59,7 @@ export class Assets {
     stream: NodeJS.ReadableStream,
     filename: string,
     extra: Record<string, unknown> = {},
+    expected?: { size: number; sha256: string },
   ) {
     filename = basename(filename.replaceAll("\\", "/")).slice(0, 200);
     const ext = extname(filename).toLowerCase();
@@ -79,7 +80,7 @@ export class Assets {
     const meter = new Transform({
       transform: (chunk: Buffer, _encoding, callback) => {
         size += chunk.length;
-        if (size > this.limit)
+        if (size > this.limit || (expected && size > expected.size))
           return callback(
             new AppError("upload_too_large", "文件超过上传限制", 413),
           );
@@ -127,6 +128,9 @@ export class Assets {
       }
       if (!size || !signature(header, ext))
         throw new AppError("invalid_media", "文件内容与扩展名不匹配", 415);
+      const sha256 = hash.digest("hex");
+      if (expected && (size !== expected.size || sha256 !== expected.sha256))
+        throw new AppError("invalid_output", "输出大小或 SHA-256 不匹配", 422);
       await rename(temporary, final);
       return this.store.put("asset", {
         id: assetId,
@@ -134,7 +138,7 @@ export class Assets {
         kind: type[0],
         mimeType: type[1],
         size,
-        sha256: hash.digest("hex"),
+        sha256,
         storageKey,
         createdAt: now(),
         ...extra,

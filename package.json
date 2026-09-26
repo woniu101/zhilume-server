@@ -1,6 +1,6 @@
 {
   "name": "zhilume-server",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -22,7 +22,8 @@
     "fastify": "^5.12.5",
     "lucide-react": "^0.577.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

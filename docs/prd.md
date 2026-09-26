@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.15 |
+| 文档版本 | v0.16 |
 | 编写日期 | 2026-09-26 |
 | 文档用途 | 指导三端开发、接口设计与验收 |
 | 当前状态 | 视觉方向已确认，进入首期开发；实现进度另见开发记录 |
@@ -33,8 +33,8 @@
 7. 生成后端由自主部署的 Server、Worker 承担。Worker 可部署到优云智算、AutoDL、其他 GPU 平台或用户自己的 GPU 主机。
 8. 三个独立仓库、独立发布；Studio 不直接调用 Worker，Server 不承担 GPU 模型推理。
 9. Studio 采用 React、TypeScript、Electron；Server 核心采用 Node.js、TypeScript，管理界面采用 React、TypeScript，桌面启动器采用 Electron。
-10. Worker 采用 Python、`asyncio`，运行 CPU 媒体执行器并保留显式模拟能力。FastAPI 当前不是必需依赖，后续如需本地 HTTP 管理或诊断接口再增加。
-11. Worker 主动连接 Server，避免要求家用 GPU 主机配置公网入站访问。
+10. Worker 采用 Python、`asyncio` 和 FastAPI/Uvicorn 接入层，运行 CPU 媒体执行器并保留显式模拟能力。Server 主动连接 Worker，执行核心与 HTTP/WebSocket 路由分离。
+11. Server 主动连接 Worker；Server 不需要公网地址。网络可达性由用户自行解决，不实现 SSH 隧道、组网或中继，也不提供配套工具入口或配置示例。
 12. 优先本地开发三端流程，再进行远程 Worker 联调，最后按选定范围接入真实生成能力。
 13. Studio 与 Server 首期支持深色、浅色和跟随系统。已确认视觉为“中性黑白灰主体＋少量雾蓝强调”，不采用大面积蓝色界面。
 
@@ -71,7 +71,7 @@
 | S03 | 基础内容 | 文本编辑、图片预览、视频播放、音频波形与播放、替换、下载 |
 | S04 | 素材 | 本地上传、当前画布选取、项目素材库、文件夹、筛选、搜索、属性与双向复用 |
 | S05 | Server | 项目／画布存储、资产存储、任务记录、简单调度、能力目录、管理后台 |
-| S06 | Worker | 注册、认证、主动连接、心跳、CPU 视频处理、模拟执行、进度、取消、输入输出传输 |
+| S06 | Worker | 接入服务、认证、心跳、CPU 视频处理、模拟执行、进度、取消、输入输出传输 |
 | S10 | 媒体工具 | 原图裁剪、宫格切分、多图拼图；本机 FFmpeg / Web WASM / CPU Worker 视频截取和抽音轨 |
 | S11 | 图片执行 | 2512 文生图、2.1 文生图/指令编辑/多图参考：独立能力、配置调度、ComfyUI 工作流；GPU 待验收 |
 | S07 | 发布 | Studio Web／Windows 桌面版；Server 无界面服务／Windows 启动器；Worker 命令行 |
@@ -103,7 +103,7 @@
 - 拼图原图合计最多 6400 万像素；单张原图/输出最多 3200 万像素，输出边长最多 16384。拼图单格 64–2048 px、间隔 0–100 px；输出 PNG。
 - 桌面视频：独立 FFmpeg 子进程，输入/输出各限 1 GB，输入分块传输，取消停止进程。截取重新编码 MP4 H.264/AAC，抽音轨输出 PCM WAV。
 - Web 视频：按需加载同源单线程 ffmpeg.wasm；第一版保守限制输入 64 MB、原视频时长 120 秒、执行超时 180 秒。这是产品保护限制，不代表已完成上限压力验收。超过限制可显式选择在线 CPU Worker 或桌面版。
-- CPU Worker：主动领取视频任务，下载校验、后台 FFmpeg、进度、取消、上传、归档使用统一租约协议，不申请 GPU。没有安装 FFmpeg 时不发布媒体能力。
+- CPU Worker：接收 Server 分配的视频任务，输入校验、后台 FFmpeg、进度、取消、输出下载、归档使用统一租约协议，不申请 GPU。没有安装 FFmpeg 时不发布媒体能力。
 - 工具先处理后预览，再保存为新素材、新节点，或对同类型单结果替换当前节点。原始资产不改写，画布修改可撤销，宫格输出作为一次画布操作插入。
 - 每个结果保存来源资产 ID、操作标识、参数、输出序号；远程结果保存任务 ID。上传失败时保留窗口中的 Blob，重试跳过已成功上传的结果，也可下载保存。关闭窗口/进程不承诺恢复尚未保存的处理结果。
 - 2512 只支持文生图，不混同 Edit2511；2.1 纳入文生图、指令编辑、多图参考和 RGBA。操作与模型分开，参考顺序必须保留；不支持的参数明确报错，不静默丢弃。
@@ -122,9 +122,9 @@ Studio Web / Studio Desktop
        ├─ 长期资产与素材库
        ├─ 任务、能力和调度
        └─ Web Admin
-             ▲
-             │ Worker 主动建立连接；连接建立后双向传递控制消息
-             │ 输入下载／结果上传使用 HTTP 文件接口
+             │ Server 主动建立连接；连接建立后双向传递控制消息
+             │ Server 上传输入／下载结果；Worker 无回调 Server
+             ▼
        Zhilume Worker
        ├─ asyncio 控制程序
        ├─ 模拟执行适配器（首期）
@@ -146,7 +146,7 @@ Studio Web / Studio Desktop
 | Server Core | Node.js＋TypeScript | API、存储、任务调度可脱离 Electron 独立运行 |
 | Server Admin | React＋TypeScript | 复杂配置放在 Web Admin，启动器只负责启停与入口 |
 | Server Launcher | Electron | 管理独立 Server 进程，不把业务逻辑写进窗口组件 |
-| Worker | Python＋asyncio | 通信、执行器、缓存与状态分离；不依赖 FastAPI 启动 |
+| Worker | Python＋asyncio＋FastAPI/Uvicorn | 通信、执行器、缓存与状态分离；接收 Server 主动连接 |
 | 数据库 | 首期默认 SQLite，Server 单实例 | 包含 schema 迁移；后续 PostgreSQL 另行适配，不假设自动兼容 |
 | 文件存储 | 首期 Server 本地受管理目录 | 存储接口隔离；对象存储后续扩展 |
 | 控制通信 | HTTPS API＋WebSocket | WS 用于事件和任务控制，不传输大媒体正文 |
@@ -463,18 +463,19 @@ D:\AI_Project\zhilume\
 ```text
 Worker CLI
 ├─ 配置与凭证
-├─ asyncio 连接、心跳与重连
+├─ FastAPI/Uvicorn HTTP 与 WebSocket 接入
+├─ asyncio 心跳与任务运行
 ├─ 本地任务／租约记录
-├─ 输入缓存与结果上传
+├─ 输入接收缓存与结果下载服务
 └─ Executor 接口
-   ├─ MockExecutor                 首期
-   ├─ ComfyUIExecutor              后续
+   ├─ MockExecutor                 已实现
+   ├─ ComfyUIExecutor              协议已实现，真实 GPU 待验收
    ├─ PythonProcessExecutor        后续
-   └─ MediaToolExecutor            后续
+   └─ MediaToolExecutor            CPU 截取和抽音轨已实现
 ```
 
 - 核心模块不依赖 FastAPI 的 Request、路由或生命周期对象。
-- 需要健康检查／本地管理时，可以增加 HTTP 适配层调用现有核心，不重写执行逻辑。
+- HTTP/WebSocket 适配层调用执行核心，提供鉴权、身份检查、控制消息和文件传输；由 Server 负责重连。
 - CPU 密集或阻塞任务、模型推理放入受管理的独立进程／引擎，避免阻塞 asyncio 心跳循环。
 - 默认同时执行一个任务，可声明 capacity；首期通过两个模拟 Worker 验证多执行端调度。
 - 每次 attempt 使用隔离目录，禁止多个任务共享会被单方清理的临时输入路径。
@@ -483,15 +484,15 @@ Worker CLI
 
 ### 12.2 接入与心跳
 
-1. 管理员在 Server 创建短期、一次性的接入凭证。
-2. Worker 使用 Server 地址和接入凭证注册，获取 workerId 与可撤销的长期凭证。
-3. Worker 主动建立受认证 WebSocket，发送版本、能力及本地活动尝试摘要。
-4. Server 校验兼容性并接受会话；不兼容时解释所需版本，禁止接任务。
-5. Worker 定时发送心跳与忙闲状态；断线采用指数退避和抖动重连。
+1. Worker 启动受鉴权保护的接入服务，生成独立 workerId 和接入密钥，默认监听本机 4320。
+2. 管理员在 Server 填写 Worker 地址和密钥；测试连接核对身份、协议与绑定状态，再保存。
+3. Server 主动建立受认证 WebSocket；Worker 发送能力及本地活动尝试摘要，双方确认后接单。
+4. 每个 Worker 状态目录绑定一个 Server 身份；不同 Server 使用独立 Worker 状态目录。网络断开时不解除绑定。
+5. Worker 定时报告心跳；Server 负责指数退避重连。Server 的入站地址不出现在任务或 Worker 配置中。
 
 默认参数用于首期测试，可配置：心跳每 10 秒一次，40 秒无心跳显示离线，任务租约默认 90 秒并续期。Worker 丢失租约后不得开始新计算；在安全点停止旧尝试并保留诊断信息。Server 仅接受有效当前 attempt／lease 的结果提交。
 
-Worker connectionState 与任务状态分开：connected、disconnected、draining、disabled。disabled 的 Worker 不再获得任务，其凭证撤销后也不能继续访问任务文件。
+Worker connectionState 与任务状态分开：connected、disconnected、draining、disabled。disabled 的 Worker 不再获得任务，Server 停止其连接并不再派发新任务，已有任务遵循取消和租约语义。
 
 ### 12.3 能力声明
 
@@ -510,7 +511,7 @@ Studio 从 Server 获取聚合目录；不直接依赖某个 Worker 的 ComfyUI 
 
 ```json
 {
-  "protocolVersion": "1.0",
+  "protocolVersion": "2.0",
   "messageId": "unique-id",
   "type": "task.progress",
   "timestamp": "2026-09-25T00:00:00Z",
@@ -655,7 +656,7 @@ Studio 重连后刷新项目 revision、非终态任务和 Worker 状态快照�
 | M1：项目与画布 | Server 项目／画布持久化；Studio 四类空节点、操作命令、连线、保存恢复 | C01–C12 核心操作通过；刷新恢复；冲突不会静默覆盖 |
 | M2：内容与素材 | 文本编辑、媒体预览、流式上传下载、项目素材库、双向复用 | 四类测试内容完整流转；Web 与桌面内容一致；删除语义验证 |
 | M3：模拟执行闭环 | Worker 接入、能力、调度、状态、取消、结果归档；Studio 任务面板与 Admin | 一个文本＋三类媒体模拟成功；两个 Worker；重试／取消／断线／重启用例通过 |
-| M4：远程与发布验收 | 本地 Studio／Server＋Linux 远程模拟 Worker；安装包、部署配置、备份与迁移说明 | 无公网入站 Worker 接入；媒体传输与重连通过；干净 Windows 启动包和 Linux 服务启动通过 |
+| M4：远程与发布验收 | 本地 Studio／Server＋Linux 远程模拟 Worker；安装包、部署配置、备份与迁移说明 | 无公网 Server 接入；媒体传输与重连通过；干净 Windows 启动包和 Linux 服务启动通过 |
 | M5：真实生成（后续） | 按功能决策接入模型与适配器 | 每项选定能力独立提交输入、输出、耗时、显存及质量验收记录 |
 
 M1／M2 完成不依赖 Worker；M3 可使用固定测试媒体。M4 在有合适远程测试环境后执行，未进行真实远程验证时应报告该项未完成，不能用本机双进程替代结论。
@@ -702,7 +703,7 @@ M1／M2 完成不依赖 Worker；M3 可使用固定测试媒体。M4 在有合�
 | A18 | 临时目录隔离 | 两任务引用同一资产时，清理一方不影响另一方；云 Worker 删除后正式结果仍可访问 |
 | A19 | 文件可靠性 | 超限、磁盘满、hash错误、传输中断可重试且不出现正式半文件；Range 可定位播放 |
 | A20 | 双形态 | Web／桌面同项目一致；Studio 退出不关闭 Server；Windows 两安装包无需全局 Node/Python |
-| A21 | 远程模拟 | Linux Worker 主动接入；断网重连、文件传输和租约核对通过，不要求 Worker 公网入站 |
+| A21 | 远程模拟 | Server 主动连接 Linux Worker；断网重连、文件传输和租约核对通过，不要求 Server 公网入站 |
 | A22 | 协议兼容 | TS／Python 同一组契约样例结果一致；不兼容版本拒绝接任务并说明原因 |
 | A23 | 性能与持久化 | 第 15 节基准场景达标；任务归档和文档更新原子提交；关机恢复无已确认数据丢失 |
 | A24 | 安装与升级 | 端口冲突、重复实例、数据目录权限不足可诊断；升级／迁移保留既有数据 |
@@ -732,7 +733,7 @@ M1／M2 完成不依赖 Worker；M3 可使用固定测试媒体。M4 在有合�
 | 媒体额外编码格式 | 以跨 Web／Electron 测试结果逐项增加，不仅根据扩展名放行预览承诺 | M2 |
 | 跨项目素材／普通媒体编辑 | 保持后续候选，用户选择后单独增加范围 | 首期后续规划 |
 | 真实生成能力与模型 | Qwen 2512 / 2.1 已纳入；显存、数量、尺寸及效果需 GPU 实测，不沿用旧项目上限 | M5 验收 |
-| 云平台自动管理与 Worker 安装器 | 保持后置，首期只验证人工部署的主动接入 | 远程流程稳定后 |
+| 云平台自动管理与 Worker 安装器 | 保持后置，首期只验证人工部署的地址接入 | 远程流程稳定后 |
 
 默认方案可以迭代，但不得以“以后可扩展”为由只交付空按钮、假进度、不能恢复的临时文件引用或只能在一个发布形态运行的实现。
 
@@ -743,7 +744,7 @@ M1／M2 完成不依赖 Worker；M3 可使用固定测试媒体。M4 在有合�
 - [旧项目能力对照](research/updream/zhihua-service-capability-comparison.md)：仅作能力参考，已明确不使用该仓库；旧仓库测试通过不代表织镜已有功能。
 - [Electron 进程模型](https://www.electronjs.org/docs/latest/tutorial/process-model)：桌面界面与独立服务进程的技术背景。
 - [Python asyncio](https://docs.python.org/3/library/asyncio.html)：Worker 异步通信与子进程协调基础。
-- [FastAPI 异步说明](https://fastapi.tiangolo.com/async/)：FastAPI 与异步运行机制属于不同层次，当前作为可选适配层。
+- [FastAPI 异步说明](https://fastapi.tiangolo.com/async/)：FastAPI 与异步运行机制属于不同层次，当前作为 Worker 接入适配层。
 
 本文中的路径、接口、能力 ID 与状态为织镜新设计，不应视为 Updream 内部实现。工程与契约已开始落地；按里程碑逐步验收，不一次性实现全部远期能力。
 
@@ -837,7 +838,7 @@ M1／M2 完成不依赖 Worker；M3 可使用固定测试媒体。M4 在有合�
 - 模型切换保留提示词、参考图和参数，不支持时明确禁用提交。生成草稿与待重试请求随项目保存，重新打开恢复；保存失败保留本机草稿。
 - 2512 文生图使用独立 qwen2512-v1；2.1 使用 qwen21-v1。2512 不接受参考图；编辑 1 张，多参考至少 2 张、至配置上限。输入单张不超过 64 MB，来源资产不可变。
 - 文生图宽高均为 32 倍数，范围由 Worker 配置声明；参考编辑不接受手填宽高，以第一张图比例和 referenceResolution 构建潜空间。RGBA 只保留模型实际输出通道，不能通过给 RGB 添空通道宣称完成透明生成。
-- Worker Python 3.11+，asyncio + httpx，ComfyUI 为专用本机引擎，无新增公网 HTTP 服务。默认不启用图片能力；必须用 --enable-image-execution 和专用配置显式开启。
+- Worker Python 3.11+，asyncio + FastAPI/Uvicorn 接入服务，httpx 只用于内部引擎请求，ComfyUI 为专用本机引擎。默认不启用图片能力；必须用 --enable-image-execution 和专用配置显式开启。
 - Worker 用加载器文件列表确认模型名称、用 object_info 确认节点存在；文件名和图结构只由 Worker 控制。多个 Worker 的 profile 指纹一致才可承接相同任务，不能仅凭“支持图片”调度。
 - ComfyUI 任务 UUID 对应执行尝试；提交前落本地记录。取消仅针对该 UUID，响应丢失不重发 prompt；无法确认停止则撤下图片能力。重启先核对遗留提交，不自动重新生成。
 - 输入校验/下载、图片执行、输出校验/归档显示实际阶段。没有采样进度时为不定进度，禁止编造百分比；心跳不被阻塞。
@@ -867,3 +868,14 @@ M1／M2 完成不依赖 Worker；M3 可使用固定测试媒体。M4 在有合�
 - 节点显示真实排队/运行/失败/取消状态和失败原因，可直接重试/取消；Server 管理台显示具体操作名、错误、Worker 心跳、忙碌/排空状态及当前任务。
 - Worker 部署准备工具默认只规划，不下载权重、不启动 ComfyUI、不提交任务；显式应用只创建清单中的软链接，缺失/歧义/冲突即停止。公共模型挂载以实际文件为准，准备工具可检查 Server 协议及 ComfyUI 节点/加载器清单。
 - 云端 Worker 需要可访问的 Server HTTPS/WSS 地址。本次平台只读实例列表查询返回 0，尚未部署到优云智算，也未创建或启动 GPU 实例。新实例与真实推理验收前告知用户。
+
+
+## 31. Server 主动连接 Worker（协议 2.0）
+
+- 管理台仅填写执行端名称、Worker 地址和密钥；提供测试、保存、连接设置、停用和排空。地址必须从 Server 所在机器可达。
+- Worker 提供鉴权 GET /api/v1/system、WS /api/v1/connect、PUT /api/v1/attempts/:attemptId/inputs/:assetId、GET /api/v1/attempts/:attemptId/output。大文件使用流式 HTTP，不塞进控制消息。
+- assign → accepted → Server 上传输入 → inputs_ready → 执行/进度 → result_ready → Server 下载并校验归档 → commit_ack。无输入任务直接执行。
+- 文件访问限定当前 attempt/lease，输入按声明大小/SHA-256 校验后原子落盘；输出按实际字节与声明校验，归档确认前 Worker 保留输出。同一连接断开重连不重新提交生成。
+- Server 保留私有身份和连接密钥文件，列表不返回密钥；Worker 独立状态目录保留身份、绑定与执行临时文件。协议 1.0 注册/回调接口移除，不维护初版历史兼容层。
+- 网络可达性由用户自行解决。不内置 SSH、组网、中继，不提供 TunnelFlow 示例、链接或配套入口。
+- 首期文件中断可重新传输完整文件、已完整上传的输入去重；暂不宣称分块断点续传。真实平台 HTTPS/WSS 与模型推理需在云端另行验收。

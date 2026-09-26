@@ -1,6 +1,6 @@
 # Zhilume Server
 
-独立服务、Web 管理台与 Windows 启动器。当前 0.5.0 初版，配套 Studio 0.7.0 / Worker 0.4.0。支持图片任务调度、CPU 媒体处理和模拟能力；真实 Qwen GPU 推理尚未验收。
+独立服务、Web 管理台与 Windows 启动器。当前 0.6.0 初版，配套 Studio 0.8.0 / Worker 0.5.0。支持图片任务调度、CPU 媒体处理和模拟能力；真实 Qwen GPU 推理尚未验收。
 
 - `/api/v1/image-models` 返回 Qwen 2512 / 2.1 目录及在线执行配置；未显式启用图片 Worker 时不能提交 GPU 任务。
 - 调度按模型、配置指纹、工作流版本和操作匹配，保留多图顺序与结果 provenance。
@@ -53,7 +53,7 @@ npm run pack
 
 ## Worker 与协议
 
-在管理台“接入执行端”生成一次性 10 分钟凭证，在 Worker 仓库运行生成的命令。Worker 主动连接 Server，无需暴露 Worker 入站端口。
+在管理台“接入执行端”填写 Worker 地址和接入密钥，可先测试连接。Server 主动连接 Worker，并上传输入、下载结果；Server 无需公网地址。连接地址必须从 Server 所在机器可达。网络配置由用户自行解决，本项目不内置 SSH 隧道、组网、中继或外部工具入口。
 
 协议源在 `contracts/`，跨仓库快照通过脚本生成：
 

@@ -1,31 +1,26 @@
-# 协议开发基线（信封 1.0 / 能力目录 1.1）
+# 协议开发基线（信封 2.0 / 契约快照 2.0.0）
 
 当前实现覆盖 GPU 图片执行协议、CPU 媒体处理及显式模拟闭环；GPU 推理尚未验收。初版直接修改契约，不为历史开发版保留兼容分支。能力目录由 Server 发布、Worker 内含带 SHA-256 的快照。
 
 ## Worker 接入
 
-1. 管理员 `POST /api/v1/enrollments` 获取单次凭证。
-2. Worker `POST /api/v1/workers/register`，JSON 为 `{token,name,platform}`，获得 `{workerId,credential,protocolVersion}`。
-3. 用 Worker Bearer 凭证连接 `/api/v1/worker/connect`。
-4. 发送 hello，payload 包含 `capabilities: string[]`、`activeAttempts: string[]`、`imageProfiles`。未启用图片执行时 imageProfiles 为空数组。
-5. Server welcome 后接收任务，维持 10 秒心跳；90 秒租约由 heartbeat 续期。
-
-信封字段：`protocolVersion: "1.0"`、`messageId`、`type`、`payload`。任务消息还必须有 `jobId`、`attemptId`、`leaseId`；进度有递增整数 `sequence`。消费者必须验证当前契约，不要直接信任对端消息。
+1. Worker 启动受鉴权接入服务，默认 127.0.0.1:4320；本机 --show-token 显示独立接入密钥。无需 Server 地址。
+2. 管理员 POST /api/v1/workers/probe 测试 {address,credential}；POST /api/v1/workers 保存，可附 name。GET /workers 不返回密钥。
+3. Server 主动请求 Worker /api/v1/system，校验 workerId 和协议 2.0；主动建立 /api/v1/connect WebSocket，Authorization Bearer 与 X-Zhilume-Server-Id 通过请求头传递。
+4. Worker 首次鉴权连接绑定 Server 身份；其他 Server 拒绝接入。hello 包含 workerId、capabilities、imageProfiles、activeAttempts；Server welcome 后允许接单。
+5. Server 管理持久连接及退避重连；Worker 10 秒心跳，默认 90 秒租约。停用断开连接；排空不接新任务。
 
 ## 一次任务
 
-`task.assign` → `task.accepted` → 多次 `task.progress` → 上传输出 → `task.result_ready` → `task.commit_ack`。
+`task.assign` → `task.accepted` → Server 上传输入 → `task.inputs_ready` → `task.progress` → `task.result_ready` → Server 下载/校验/归档 → `task.commit_ack`。
 
-- assign.payload 包含 operation、input、leaseSeconds。
-- `mock.text.echo.v1` 输入 `{text}`，返回 UTF-8 TXT，最多 12,000 字。
-- `mock.media.copy.v1` 输入 `{assetId,asset}`，下载原文件并原样上传，Server 再次比较输入输出类型与 SHA-256。
-- `media.video.trim.v1` 输入 `{assetId,asset,start,end}`，输出 MP4 H.264/AAC；`media.audio.extract.v1` 同样输入，输出 PCM WAV。start/end 为秒，要求 0 <= start < end <= 86400；Studio 另按实际时长限制范围。无音轨时抽取任务失败，不伪造静音。
-- Worker CPU 执行器运行 FFmpeg 子进程，取消/租约过期终止进程；进度来自输出时间。
-- Worker 下载：`GET /api/v1/worker/jobs/{jobId}/inputs/{assetId}`。
-- Worker 上传：`POST /api/v1/worker/jobs/{jobId}/output?filename=...`，body 为二进制流，Content-Type 为 application/octet-stream。
-- 两个文件接口均要求 Worker Bearer、`X-Attempt-Id`、`X-Lease-Id`。
-- 上传返回 `{id,size,sha256}`；result_ready.payload 为 `{assetId,sha256}`。
-- commit_ack 之前不可清理本地输出；重复 result_ready 可获得重复确认。
+- 信封 protocolVersion=2.0；任务消息包含 jobId、attemptId、leaseId，进度有递增 sequence。
+- 输入元信息包含 id、filename、size、sha256，图片参考保持声明顺序；Worker 不访问 Server 的素材 URL。
+- Server PUT Worker `/api/v1/attempts/{attemptId}/inputs/{assetId}` 流式上传，鉴权头加 X-Lease-Id。Worker 校验任务归属、有效租约、大小与哈希后原子改名；完整文件重复上传直接确认。
+- result_ready.payload 为 `{filename,size,sha256}`；Server GET 同一 Worker `/api/v1/attempts/{attemptId}/output`，流式导入并核对声明和能力契约。结果只归档到当前有效尝试。
+- Worker 收到 commit_ack 后清理成功输出；重复 result_ready 在归档后再次得到确认。连接中断期间保留输出；进程重启不自动重复执行，Server 标记中断后允许手动重试。
+- 模拟、CPU 与图片生成仍使用原有操作 ID；CPU 输入 {assetId,start,end}，输出 MP4 H.264/AAC 或 WAV PCM。模拟结果必须标记 simulation。
+- 原 enrollments、workers/register、worker/connect 和 Worker 回调文件接口全部移除，不兼容协议 1.0。
 
 ## 状态与恢复
 
@@ -35,7 +30,7 @@
 
 ## 主要 HTTP 接口
 
-除系统信息、凭证交换、Worker 注册和签名媒体 URL 外，均需对应角色的 Bearer 凭证。
+除系统信息、凭证交换和签名媒体 URL 外，均需对应角色的 Bearer 凭证。
 
 | 资源 | 已实现接口 |
 |---|---|
@@ -46,7 +41,7 @@
 | Library | GET/POST /projects/:id/library；PATCH/DELETE /library/:id |
 | Folder | POST /projects/:id/folders；PATCH/DELETE /folders/:id |
 | Job | GET/POST /jobs；GET /jobs/:id；POST /jobs/:id/cancel、/retry |
-| Worker | GET /workers；PATCH /workers/:id（draining/disabled） |
+| Worker | GET/POST /workers；POST /workers/probe；PATCH /workers/:id（地址、密钥、名称、draining/disabled） |
 | Capability | GET /capabilities；GET /image-models（模型目录、在线执行配置及未验收状态） |
 | Admin | GET /stats |
 | UI events | POST /events/ticket；WS /events?ticket=... |
@@ -64,7 +59,7 @@ viewport 的 zoom 限制 0.15–2.5。Folder PATCH 校验所属项目与祖先�
 
 ## 图片操作与执行配置
 
-能力目录版本 1.2.0。Qwen Image 2512 仅支持 `image.generate.v1`；2.1 另支持 `image.edit.v1` 与 `image.reference.v1`。模型状态仍为 `awaiting_gpu_validation`，这与在线可试运行状态相互独立。
+契约快照版本 2.0.0。Qwen Image 2512 仅支持 `image.generate.v1`；2.1 另支持 `image.edit.v1` 与 `image.reference.v1`。模型状态仍为 `awaiting_gpu_validation`，这与在线可试运行状态相互独立。
 
 hello.imageProfiles 为公开配置数组：modelId、profileId（64 位 SHA-256）、workflowRevision、operations、maxReferences、formats、minSize=256、maxSize<=2048、sizeStep=32、referenceResolution、defaultSteps、maxSteps=100、validation=unverified。Worker 仅在明确启用并通过只读节点/模型检查后发布。Server 按操作、模型、配置指纹与工作流版本共同调度，不能只按 image.generate 匹配。
 
@@ -87,7 +82,7 @@ hello.imageProfiles 为公开配置数组：modelId、profileId（64 位 SHA-256
 - 文生图参考数组必须为空，另传 width/height；均为配置范围内的 32 倍数。
 - 编辑恰好 1 张；多参考 2–maxReferences 张，不接受重复 ID。每张为已归档图片且不超过 64 MB。
 - 编辑/参考禁止同时指定 width/height，referenceResolution 由 Server 从配置补齐。输出比例跟随第一张图，Qwen 工作流取整对齐尺寸。
-- Server 派发时附 `referenceAssets` 元信息数组，顺序与 referenceAssetIds 一致。Worker 逐文件下载并校验大小/SHA-256；下载接口只允许当前任务输入 ID。
+- Server 派发时附 `referenceAssets` 元信息数组，顺序与 referenceAssetIds 一致。Server 逐文件上传，Worker 校验大小/SHA-256；上传接口只允许当前任务输入 ID。
 - profile 离线/变更时拒绝新提交和重试；已排队任务不会自动改投其他模型或配置。
 - 输出为单张 PNG，Server 从 Job 生成 provenance，包含有序来源、模型、指纹、工作流版本、种子和参数。结果新建 Asset；原文件不改写。
 - ComfyUI 采样百分比尚未接入时，progress=null，展示真实阶段，不能伪造百分比。
@@ -100,4 +95,4 @@ hello.imageProfiles 为公开配置数组：modelId、profileId（64 位 SHA-256
 
 媒体节点 data.generationDraft 保存图片表单：operation、modelId、profileId、prompt、negative、sizeMode、refs（有序素材 ID）、format、width、height、steps、seed；可选 request={fingerprint,id,seed} 保存未确认提交的幂等请求。data.textDraft 保存未应用到正文的文本编辑。草稿允许空提示词等未完成状态，Server 校验类型、长度与范围；真正提交任务时仍执行严格输入校验，草稿不代表可执行任务。复制节点应清除 request。沿用画布 revision 乐观锁与本地草稿恢复机制。
 
-GET /workers 增加派生 state（disabled/offline/draining/busy/ready）、reason、heartbeatAgeSeconds 和 activeJobs（id/status/stage）。心跳年龄超过 40 秒或连接断开时派生为 offline；状态不表示 GPU 模型已通过推理验收。注册凭证摘要不对外返回。
+GET /workers 增加派生 state（disabled/offline/draining/busy/ready）、reason、heartbeatAgeSeconds 和 activeJobs（id/status/stage）。心跳年龄超过 40 秒或连接断开时派生为 offline；状态不表示 GPU 模型已通过推理验收。连接密钥不对外返回。

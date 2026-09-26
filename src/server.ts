@@ -4,11 +4,12 @@ import websocket from "@fastify/websocket";
 import staticFiles from "@fastify/static";
 import { Ajv } from "ajv";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { createReadStream, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { WorkerTransport, endpoint, probeWorker } from "./worker-transport.js";
 import { workerStatus } from "./worker-status.js";
 import { Store } from "./store.js";
 import { Assets } from "./assets.js";
@@ -93,7 +94,7 @@ export async function createApp(options: Options) {
     if (socket?.readyState !== 1) return;
     socket.send(
       JSON.stringify({
-        protocolVersion: "1.0",
+        protocolVersion: "2.0",
         messageId: id(),
         type,
         payload,
@@ -109,6 +110,13 @@ export async function createApp(options: Options) {
     emit("job.changed", { id: job.id });
     return job;
   };
+  const pendingTransfers = new Set<Promise<any>>();
+  const uploads = new Set<string>(), downloads = new Set<string>();
+  const transport = new WorkerTransport(options.root, (workerId, lastError) => {
+    if (closed) return;
+    const w = store.get("worker", workerId);
+    if (w) { store.put("worker", { ...w, lastError }); emit("worker.changed"); }
+  });
   const publicAsset = (a: any) => assets.decorate(a);
   const publicJob = (job: any) => ({
     ...job,
@@ -125,10 +133,6 @@ export async function createApp(options: Options) {
     const session = store.get("session", digest(token));
     if (session && session.expires > Date.now())
       return { role: "admin", id: "owner" };
-    const worker = store
-      .all("worker")
-      .find((w) => !w.disabled && equal(w.tokenHash, digest(token)));
-    if (worker) return { role: "worker", id: worker.id };
     throw new AppError("unauthorized", "请连接 Server 并验证访问凭证", 401);
   };
   const owner = (req: any) => {
@@ -140,19 +144,6 @@ export async function createApp(options: Options) {
     if (editable && p.archivedAt)
       throw new AppError("project_archived", "项目已归档，请先恢复", 409);
     return p;
-  };
-  const assertAttempt = (req: any, job: any) => {
-    const who = auth(req);
-    if (
-      who.role !== "worker" ||
-      who.id !== job.workerId ||
-      String(req.headers["x-attempt-id"]) !== job.attemptId ||
-      String(req.headers["x-lease-id"]) !== job.leaseId ||
-      job.leaseExpires < Date.now() ||
-      terminal.has(job.status) ||
-      job.status === "cancel_requested"
-    )
-      throw new AppError("stale_attempt", "当前任务尝试已失效", 409);
   };
   await app.register(cors, {
     // Desktop app:// and separately hosted Studio must preflight mutations.
@@ -184,7 +175,7 @@ export async function createApp(options: Options) {
   app.get("/api/v1/system", async () => ({
     name: "Zhilume Server",
     version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version,
-    protocolVersion: "1.0",
+    protocolVersion: "2.0",
     authentication: true,
   }));
   const loginAttempts = new Map<string, { count: number; until: number }>();
@@ -606,81 +597,40 @@ export async function createApp(options: Options) {
     owner(req);
     return store.all("worker").map(({ tokenHash, ...w }) => ({ ...w, ...workerStatus(w, store.all("job")) }));
   });
-  app.post("/api/v1/enrollments", async (req) => {
-    owner(req);
-    const token = randomBytes(24).toString("base64url");
-    store.put("enrollment", {
-      id: digest(token),
-      expires: Date.now() + 600000,
-    });
-    return { token, expiresIn: 600 };
+  app.post("/api/v1/workers/probe", async (req: any) => {
+    owner(req); return probeWorker(endpoint({ ...(req.body.id ? transport.get(req.body.id) : {}), ...req.body }), transport.serverId);
   });
-  app.post("/api/v1/workers/register", async (req: any) => {
-    const key = digest(String(req.body?.token || ""));
-    const enrollment = store.get("enrollment", key);
-    if (!enrollment || enrollment.expires < Date.now())
-      throw new AppError("invalid_enrollment", "接入凭证无效或已过期", 401);
-    const credential = randomBytes(32).toString("base64url");
-    const worker = {
-      id: id(),
-      name: text(req.body.name, 100),
-      platform: text(req.body.platform, 100),
-      tokenHash: digest(credential),
-      capabilities: [],
-      connected: false,
-      disabled: false,
-      draining: false,
-      lastHeartbeat: 0,
-    };
-    store.atomic(() => {
-      store.remove("enrollment", key);
-      store.put("worker", worker);
-    });
-    return { workerId: worker.id, credential, protocolVersion: "1.0" };
+  app.post("/api/v1/workers", async (req: any, reply) => {
+    owner(req);
+    const config = endpoint(req.body), info = await probeWorker(config, transport.serverId);
+    if (store.all("worker").some(w => w.id === info.workerId || w.address === config.address))
+      throw new AppError("worker_exists", "此 Worker 已接入，请编辑已有连接", 409);
+    transport.set(info.workerId, config);
+    const w = { id: info.workerId, name: text(req.body.name || info.workerName, 100), platform: text(info.platform, 100), address: config.address,
+      capabilities: [], imageProfiles: [], connected: false, disabled: false, draining: false, lastHeartbeat: 0, lastError: null };
+    store.put("worker", w); connectWorker(w);
+    return reply.code(201).send(w);
   });
   app.patch("/api/v1/workers/:id", async (req: any) => {
     owner(req);
     const w = requireValue(store.get("worker", req.params.id));
+    if (req.body.address !== undefined || req.body.credential !== undefined) {
+      const config = endpoint({ ...transport.get(w.id), ...req.body });
+      const info = await probeWorker(config, transport.serverId);
+      if (info.workerId !== w.id) throw new AppError("worker_identity_changed", "地址对应的 Worker 身份已变化，请作为新执行端添加", 409);
+      transport.set(w.id, config); w.address = config.address; w.connected = false;
+    }
+    if (req.body.name !== undefined) w.name = text(req.body.name, 100);
     if (req.body.draining !== undefined)
       w.draining = Boolean(req.body.draining);
     if (req.body.disabled !== undefined)
       w.disabled = Boolean(req.body.disabled);
     store.put("worker", w);
-    if (w.disabled) peers.get(w.id)?.close(1008, "Credential revoked");
+    if (w.disabled) transport.disconnect(w.id);
     else send(w.id, "drain", { draining: w.draining });
     emit("worker.changed");
     return { id: w.id };
   });
-  app.get("/api/v1/worker/jobs/:id/inputs/:assetId", async (req: any, reply) => {
-    const j = requireValue(store.get("job", req.params.id));
-    assertAttempt(req, j);
-    const allowed = j.input.referenceAssetIds || [j.input.assetId];
-    if (!allowed.includes(req.params.assetId)) throw new AppError("input_forbidden", "素材不属于此任务", 403);
-    return assets.serve(
-      requireValue(store.get("asset", req.params.assetId)),
-      req,
-      reply,
-    );
-  });
-  app.post(
-    "/api/v1/worker/jobs/:id/output",
-    { bodyLimit: 1024 ** 3 },
-    async (req: any, reply) => {
-      const j = requireValue(store.get("job", req.params.id));
-      assertAttempt(req, j);
-      if (!req.body?.pipe)
-        throw new AppError("invalid_body", "输出必须为二进制文件");
-      const a = await assets.ingest(req.body, text(req.query.filename, 255), {
-        staged: true,
-        workerId: j.workerId,
-        attemptId: j.attemptId,
-        jobId: j.id,
-        provenance: isImageOperation(j.operation) ? { operation: j.operation, sourceAssetIds: j.input.referenceAssetIds, parameters: Object.fromEntries(Object.entries(j.input).filter(([key]) => key !== "referenceAssetIds")) } : j.input.assetId ? { operation: j.operation, sourceAssetIds: [j.input.assetId], parameters: { start: j.input.start, end: j.input.end } } : undefined,
-      });
-      assertAttempt(req, requireValue(store.get("job", j.id)));
-      return reply.code(201).send({ id: a.id, size: a.size, sha256: a.sha256 });
-    },
-  );
   app.get("/api/v1/stats", async (req) => {
     owner(req);
     const list = store.all("asset").filter((a) => !a.staged);
@@ -714,6 +664,51 @@ export async function createApp(options: Options) {
     socket.on("close", () => events.delete(socket));
   });
 
+  function assertLive(job: any) {
+    const current = store.get("job", job.id);
+    if (closed || !current || current.attemptId !== job.attemptId || current.leaseId !== job.leaseId || terminal.has(current.status) || current.status === "cancel_requested" || current.leaseExpires < Date.now())
+      throw new AppError("stale_attempt", "当前任务尝试已失效", 409);
+  }
+  function track<T>(promise: Promise<T>): Promise<T> {
+    pendingTransfers.add(promise); promise.finally(() => pendingTransfers.delete(promise)).catch(() => {}); return promise;
+  }
+  async function pushInputs(job: any) {
+    if (uploads.has(job.attemptId)) return;
+    uploads.add(job.attemptId);
+    try {
+      await track((async () => {
+        const ids = job.input.referenceAssetIds || (job.input.assetId ? [job.input.assetId] : []);
+        for (const assetId of ids) {
+          assertLive(job);
+          const a = requireValue(store.get("asset", assetId));
+          await transport.transfer(job.workerId, `/api/v1/attempts/${job.attemptId}/inputs/${assetId}`, {
+            method: "PUT", headers: { ...transport.headers(job.workerId, job.leaseId), "Content-Type": "application/octet-stream", "Content-Length": String(a.size) },
+            body: createReadStream(assets.path(a)) as any, duplex: "half",
+          }, async response => { const result = await response.json() as any; if (result.sha256 !== a.sha256) throw new AppError("invalid_input", "输入校验不匹配"); });
+        }
+        assertLive(job); send(job.workerId, "task.inputs_ready", {}, job);
+      })());
+    } catch {
+      if (!closed) { const current = store.get("job", job.id); if (current?.attemptId === job.attemptId && !terminal.has(current.status)) {
+        current.stage = "输入传输中断，等待重连"; saveJob(current); transport.disconnect(job.workerId);
+      } }
+    } finally { uploads.delete(job.attemptId); }
+  }
+  async function pullOutput(job: any, result: any) {
+    if (!Number.isSafeInteger(result.size) || result.size <= 0 || result.size > assets.limit || typeof result.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(result.sha256)) throw new AppError("invalid_output", "输出大小或校验声明无效");
+    const filename = text(result.filename, 255);
+    return track(transport.transfer(job.workerId, `/api/v1/attempts/${job.attemptId}/output`, { headers: transport.headers(job.workerId, job.leaseId) }, async response => {
+      assertLive(job);
+      if (!response.body) throw new AppError("invalid_output", "输出为空");
+      const a = await assets.ingest(Readable.fromWeb(response.body as any), filename, {
+        staged: true, workerId: job.workerId, attemptId: job.attemptId, jobId: job.id,
+        provenance: isImageOperation(job.operation) ? { operation: job.operation, sourceAssetIds: job.input.referenceAssetIds, parameters: Object.fromEntries(Object.entries(job.input).filter(([key]) => key !== "referenceAssetIds")) } : job.input.assetId ? { operation: job.operation, sourceAssetIds: [job.input.assetId], parameters: { start: job.input.start, end: job.input.end } } : undefined,
+      }, { size: result.size, sha256: result.sha256 });
+      assertLive(job);
+      if (a.size !== result.size || a.sha256 !== result.sha256) throw new AppError("invalid_output", "结果内容校验失败");
+      return a;
+    }));
+  }
   function schedule() {
     if (closed) return;
     for (const job of store.all("job"))
@@ -727,9 +722,11 @@ export async function createApp(options: Options) {
         job.error = "租约已过期，请检查执行端后重试";
         saveJob(job);
       }
+    for (const w of store.all("worker")) connectWorker(w);
     for (const w of store.all("worker"))
       if (w.connected && Date.now() - w.lastHeartbeat > 40000) {
         store.put("worker", { ...w, connected: false });
+        transport.disconnect(w.id);
         emit("worker.changed");
       }
     for (const job of store
@@ -783,19 +780,10 @@ export async function createApp(options: Options) {
       );
     }
   }
-  app.get("/api/v1/worker/connect", { websocket: true }, (socket, req: any) => {
-    let who;
-    try {
-      who = auth(req);
-    } catch {
-      socket.close(1008, "Unauthorized");
-      return;
-    }
-    if (who.role !== "worker") {
-      socket.close(1008, "Worker credential required");
-      return;
-    }
-    const workerId = who.id;
+  function connectWorker(w: any) {
+    transport.connect(w, socket => attachWorker(w.id, socket));
+  }
+  function attachWorker(workerId: string, socket: WebSocket) {
     const previous = peers.get(workerId);
     peers.set(workerId, socket);
     previous?.close(1000, "Replaced connection");
@@ -803,8 +791,9 @@ export async function createApp(options: Options) {
     const handshakeTimeout = setTimeout(() => {
       if (!welcomed) socket.close(1008, "Hello timeout");
     }, 5000);
-    socket.on("message", (bytes) => {
+    socket.on("message", async (bytes) => {
       try {
+        if (closed || peers.get(workerId) !== socket) return;
         const msg = JSON.parse(bytes.toString());
         if (!validMessage(msg))
           throw new AppError("protocol_invalid", "协议版本或消息结构不兼容");
@@ -814,6 +803,8 @@ export async function createApp(options: Options) {
           return;
         }
         if (msg.type === "hello") {
+          if (msg.payload.workerId !== workerId) throw new AppError("worker_identity_changed", "Worker 身份不匹配");
+          transport.welcomed(workerId);
           if (
             !Array.isArray(msg.payload.capabilities) ||
             msg.payload.capabilities.some((v: any) => typeof v !== "string")
@@ -930,8 +921,9 @@ export async function createApp(options: Options) {
         }
         if (msg.type === "task.accepted") {
           j.status = "running";
-          j.stage = "准备输入";
+          j.stage = "传输输入";
           saveJob(j);
+          void pushInputs(j);
           return;
         }
         if (msg.type === "task.progress") {
@@ -947,7 +939,12 @@ export async function createApp(options: Options) {
           return;
         }
         if (msg.type === "task.result_ready") {
-          const a = requireValue(store.get("asset", msg.payload.assetId));
+          if (downloads.has(j.attemptId)) return;
+          downloads.add(j.attemptId);
+          let a: any;
+          try { a = await pullOutput(j, msg.payload); } finally { downloads.delete(j.attemptId); }
+          if (!a || closed) return;
+          assertLive(j);
           if (
             a.attemptId !== j.attemptId ||
             a.workerId !== workerId ||
@@ -980,9 +977,9 @@ export async function createApp(options: Options) {
           return;
         }
       } catch (error: any) {
-        socket.send(
+        if (socket.readyState === 1) socket.send(
           JSON.stringify({
-            protocolVersion: "1.0",
+            protocolVersion: "2.0",
             messageId: id(),
             type: "error",
             payload: {
@@ -1001,7 +998,7 @@ export async function createApp(options: Options) {
       if (w) store.put("worker", { ...w, connected: false });
       emit("worker.changed");
     });
-  });
+  }
   const adminPath = fileURLToPath(new URL("../admin-dist", import.meta.url));
   if (existsSync(adminPath))
     await app.register(staticFiles, { root: adminPath, prefix: "/admin/" });
@@ -1015,7 +1012,9 @@ export async function createApp(options: Options) {
   app.addHook("onClose", async () => {
     closed = true;
     clearInterval(timer);
-    for (const s of peers.values()) s.close(1001, "Server stopping");
+    transport.close();
+    for (const s of peers.values()) s.terminate();
+    await Promise.allSettled([...pendingTransfers]);
     for (const s of events) s.close();
     store.close();
   });

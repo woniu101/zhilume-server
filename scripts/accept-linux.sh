@@ -11,7 +11,7 @@ command -v "${ZHILUME_FFMPEG:-ffmpeg}" >/dev/null || { echo 'CPU 媒体验收需
 [[ -f ../zhilume-worker/uv.lock && -d ../zhilume-studio/src/contracts ]] || { echo '请在同级准备 Studio 和 Worker 仓库'; exit 1; }
 # No user Server, cloud credentials, ComfyUI process or GPU weights are used.
 # Tests create isolated temporary servers and use fake ComfyUI responses.
-unset ZHILUME_SERVER ZHILUME_ENROLLMENT ZHILUME_COMFY_CONFIG ZHILUME_ENABLE_IMAGE ZHILUME_TEST_PYTHON
+unset ZHILUME_WORKER_TOKEN ZHILUME_COMFY_CONFIG ZHILUME_ENABLE_IMAGE ZHILUME_TEST_PYTHON
 (cd ../zhilume-worker && bash deploy/install.sh && uv run --no-sync python -m unittest discover -s tests -v)
 ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci --no-audit --no-fund
 npm run build

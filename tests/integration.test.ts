@@ -1,3 +1,4 @@
+import { startWorker } from "./worker-helper.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
@@ -18,12 +19,14 @@ async function waitFor<T>(
   timeout = 15000,
 ): Promise<T> {
   const start = Date.now();
+  let lastValue: T | undefined;
   while (Date.now() - start < timeout) {
     const value = await get();
+    lastValue = value;
     if (condition(value)) return value;
     await pause(100);
   }
-  throw new Error("Timed out waiting for state");
+  throw new Error("Timed out waiting for state: " + JSON.stringify(lastValue));
 }
 async function stop(child: ChildProcess) {
   if (child.exitCode !== null) return;
@@ -149,40 +152,9 @@ test("HTTP persistence, authorization, optimistic revision, immutable assets and
     ).statusCode,
     404,
   );
-  const registration = (await req("POST", "/api/v1/enrollments")).json();
-  const registrationPayload = {
-    token: registration.token,
-    name: "worker-test",
-    platform: "test",
-  };
-  const worker = (
-    await app.inject({
-      method: "POST",
-      url: "/api/v1/workers/register",
-      payload: registrationPayload,
-    })
-  ).json();
-  assert.ok(worker.credential);
-  assert.equal(
-    (
-      await app.inject({
-        method: "POST",
-        url: "/api/v1/workers/register",
-        payload: registrationPayload,
-      })
-    ).statusCode,
-    401,
-  );
-  assert.equal(
-    (
-      await app.inject({
-        method: "GET",
-        url: "/api/v1/projects",
-        headers: { authorization: `Bearer ${worker.credential}` },
-      })
-    ).statusCode,
-    403,
-  );
+  assert.equal((await req("POST", "/api/v1/enrollments")).statusCode, 404);
+  assert.equal((await req("POST", "/api/v1/workers/register", {})).statusCode, 404);
+  assert.equal((await app.inject({ method: "GET", url: "/api/v1/workers" })).statusCode, 401);
   await app.close();
   app = await createApp({ root, token });
   assert.equal(
@@ -230,40 +202,19 @@ test(
       return result;
     };
     const p = await api("/projects", "POST", { name: "协议端到端" });
-    const enrollment = await api("/enrollments", "POST");
-    const launch = (delay: string, enroll = false) => {
-      const c = spawn(
-        process.env.ZHILUME_TEST_PYTHON ||
-          resolve(
-            "../zhilume-worker/.venv/" +
-              (process.platform === "win32"
-                ? "Scripts/python.exe"
-                : "bin/python"),
-          ),
-        [
-          "-m",
-          "zhilume_worker",
-          "--server",
-          base,
-          "--state",
-          join(root, "worker"),
-          "--delay",
-          delay,
-          ...(enroll ? ["--enrollment", enrollment.token] : []),
-        ],
-        {
-          cwd: process.env.ZHILUME_TEST_PYTHON
-            ? process.cwd()
-            : resolve("../zhilume-worker"),
-          windowsHide: true,
-          stdio: ["ignore", "pipe", "pipe"],
-        },
-      );
-      c.stdout?.on("data", (b) => (output += b.toString()));
-      c.stderr?.on("data", (b) => (output += b.toString()));
-      return c;
+    let workerPort: number | undefined;
+    let configured = false;
+    const launch = async (delay: string) => {
+      const peer = await startWorker(join(root, "worker"), ["--delay", delay], workerPort);
+      workerPort = peer.port;
+      if (!configured) {
+        await api("/workers", "POST", { address: peer.address, credential: peer.credential });
+        configured = true;
+      }
+      peer.child.stderr?.on("data", b => { output += b.toString(); });
+      return peer.child;
     };
-    child = launch(".1", true);
+    child = await launch(".1");
     await waitFor(
       () => api("/workers"),
       (w) => w.some((x: any) => x.connected),
@@ -336,7 +287,7 @@ test(
       assert.equal(result.output.size, bytes.length);
     }
     await stop(child);
-    child = launch("10");
+    child = await launch("10");
     await waitFor(
       () => api("/workers"),
       (w) => w.some((x: any) => x.connected),
@@ -364,7 +315,7 @@ test(
       () => api(`/jobs/${interrupted.id}`),
       (j) => j.status === "interrupted",
     );
-    child = launch(".1");
+    child = await launch(".1");
     await waitFor(
       () => api("/workers"),
       (w) => w.some((x: any) => x.connected),

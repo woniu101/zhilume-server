@@ -1,3 +1,4 @@
+import { startWorker } from "./worker-helper.js";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
@@ -81,11 +82,9 @@ test('real Python worker against local fake Comfy: text generation, ordered mult
     for (let i = 0; i < 250; i++) { const v = await get(); if (ready(v)) return v; await new Promise(r => setTimeout(r, 100)); }
     throw new Error('Worker timed out: ' + log);
   }
-  const enrollment = await call('/enrollments', {});
-  worker = spawn(resolve('../zhilume-worker/.venv/' + (process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')),
-    ['-m', 'zhilume_worker', '--server', base, '--state', join(root, 'worker'), '--enrollment', enrollment.token, '--comfy-config', configPath, '--enable-image-execution'],
-    { cwd: resolve('../zhilume-worker'), windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
-  worker.stderr?.on('data', b => { log = (log + b).slice(-3000); });
+  const peer = await startWorker(join(root, 'worker'), ['--comfy-config', configPath, '--enable-image-execution']);
+  worker = peer.child;
+  await call('/workers', { address: peer.address, credential: peer.credential });
   const models = await wait(() => call('/image-models'), v => v.every((m: any) => m.ready));
   assert.equal(graphs.length, 0, 'readiness must never submit inference');
   const project = await call('/projects', { name: 'CPU-only fake Comfy acceptance' });

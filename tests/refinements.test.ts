@@ -4,7 +4,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { createApp } from "../src/server.js";
-import { WebSocket } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
+import { createServer } from "node:http";
+import { once } from "node:events";
 const token = "refinement-local-test",
   headers = { authorization: `Bearer ${token}` };
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -81,9 +83,10 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
     app = await createApp({ root, token, tickMs: 30, leaseMs: 15000 });
   await app.listen({ host: "127.0.0.1", port: 0 });
   const base = `http://127.0.0.1:${(app.server.address() as any).port}`,
-    sockets: WebSocket[] = [];
+    sockets: WebSocket[] = [], listeners: ReturnType<typeof createServer>[] = [];
   t.after(async () => {
     for (const ws of sockets) ws.terminate();
+    for (const listener of listeners) await new Promise<void>(r => listener.close(() => r()));
     await app.close();
     if (
       resolve(root).startsWith(resolve(tmpdir()) + sep + "zhilume-concurrency-")
@@ -113,23 +116,20 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
   };
   const peers: any[] = [];
   for (let i = 0; i < 2; i++) {
-    const enrollment = await api("/enrollments", "POST");
-    const worker = await api("/workers/register", "POST", {
-      token: enrollment.token,
-      name: "test" + i,
-      platform: "test",
+    const workerId = crypto.randomUUID(), credential = "test-worker-credential-" + i;
+    const listener = createServer((req, res) => {
+      if (req.headers.authorization !== "Bearer " + credential) { res.writeHead(401).end(); return; }
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ name: "Zhilume Worker", workerId, workerName: "test" + i, platform: "test", protocolVersion: "2.0" }));
     });
-    const ws = new WebSocket(
-      base.replace("http:", "ws:") + "/api/v1/worker/connect",
-      { headers: { Authorization: "Bearer " + worker.credential } },
-    );
+    const wss = new WebSocketServer({ server: listener });
+    listener.listen(0, "127.0.0.1"); await once(listener, "listening"); listeners.push(listener);
+    const incoming = once(wss, "connection");
+    const worker = await api("/workers", "POST", { address: `http://127.0.0.1:${(listener.address() as any).port}`, credential });
+    const [ws] = await incoming as [WebSocket];
     sockets.push(ws);
     const messages: any[] = [];
     ws.on("message", (b) => messages.push(JSON.parse(b.toString())));
-    await new Promise<void>((resolve, reject) => {
-      ws.once("open", resolve);
-      ws.once("error", reject);
-    });
     const send = (
       type: string,
       payload: any = {},
@@ -138,7 +138,7 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
     ) =>
       ws.send(
         JSON.stringify({
-          protocolVersion: "1.0",
+          protocolVersion: "2.0",
           messageId: crypto.randomUUID(),
           type,
           payload,
@@ -152,7 +152,7 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
           ...(sequence === undefined ? {} : { sequence }),
         }),
       );
-    send("hello", { capabilities: ["mock.text.echo.v1"], activeAttempts: [] });
+    send("hello", { workerId, capabilities: ["mock.text.echo.v1"], activeAttempts: [] });
     await wait(
       () => messages,
       (m) => m.some((x: any) => x.type === "welcome"),

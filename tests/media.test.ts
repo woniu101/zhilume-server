@@ -1,3 +1,4 @@
+import { startWorker } from "./worker-helper.js";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -36,10 +37,9 @@ test('real CPU worker exports media, validates ranges and persists lineage; imag
   const models = await call('/image-models');
   assert.deepEqual(models[0].operations, ['image.generate.v1']);
   assert.ok(models.every((m: any) => m.status === 'awaiting_gpu_validation'));
-  const enrollment = await call('/enrollments', {});
-  worker = spawn(process.env.ZHILUME_TEST_PYTHON || resolve('../zhilume-worker/.venv/' + (process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')),
-    ['-m', 'zhilume_worker', '--server', `http://127.0.0.1:${port}`, '--state', join(root, 'worker'), '--enrollment', enrollment.token],
-    { cwd: resolve('../zhilume-worker'), windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+  const peer = await startWorker(join(root, 'worker'));
+  worker = peer.child;
+  await call('/workers', { address: peer.address, credential: peer.credential });
   let log = ''; worker.stderr?.on('data', b => { log = (log + b).slice(-2000); });
   async function wait(get: () => Promise<any>, ready: (v: any) => boolean) {
     for (let i = 0; i < 200; i++) { const value = await get(); if (ready(value)) return value; await new Promise(r => setTimeout(r, 100)); }

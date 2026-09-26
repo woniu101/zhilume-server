@@ -1,3 +1,4 @@
+import { startWorker } from "./worker-helper.js";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
@@ -33,15 +34,10 @@ test('Linux deployment launcher registers, returns output and reuses its private
     for (let i = 0; i < 100; i++) { const value = await get(); if (ready(value)) return value; await new Promise(r => setTimeout(r, 100)); }
     throw new Error('Deployment launcher did not reach expected state');
   }
-  const enrollment = await api('/enrollments', {});
   const state = join(root, 'worker');
-  function launch(enroll: boolean) {
-    const env: NodeJS.ProcessEnv = { ...process.env, ZHILUME_SERVER: base, ZHILUME_STATE: state, ZHILUME_WORKER_NAME: 'linux-launcher-test', ZHILUME_ENABLE_IMAGE: '0' };
-    delete env.ZHILUME_ENROLLMENT;
-    if (enroll) env.ZHILUME_ENROLLMENT = enrollment.token;
-    child = spawn('bash', ['deploy/run.sh'], { cwd: resolve('../zhilume-worker'), env, stdio: 'ignore' });
-  }
-  launch(true);
+  const peer = await startWorker(state, [], undefined, true);
+  child = peer.child;
+  await api('/workers', { address: peer.address, credential: peer.credential });
   const first = await wait(() => api('/workers'), rows => rows.length === 1 && rows[0].connected);
   assert.equal(first[0].platform, 'Linux');
   assert.ok(first[0].capabilities.includes('mock.text.echo.v1'));
@@ -55,7 +51,7 @@ test('Linux deployment launcher registers, returns output and reuses its private
   assert.equal(await fetch(base + done.output.url).then(r => r.text()), 'Linux 启动脚本 ✓');
   await stop();
   await wait(() => api('/workers'), rows => !rows[0].connected);
-  launch(false);
+  child = (await startWorker(state, [], peer.port, true)).child;
   const next = await wait(() => api('/workers'), rows => rows.length === 1 && rows[0].connected);
   assert.equal(next[0].id, first[0].id);
   assert.deepEqual(await readFile(join(state, 'identity.json')), identity);

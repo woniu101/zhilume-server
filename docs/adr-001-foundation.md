@@ -4,7 +4,7 @@
 
 ## 三端边界
 
-Studio 为 React + TypeScript + React Flow，富文本使用 Tiptap。Server 使用 Node.js + TypeScript + Fastify，数据库使用 Node 内置 SQLite，资产保存在 Server 文件目录。Worker 使用 Python + asyncio + websockets + httpx；FastAPI 仍然不需要。旧 zhihua-service 不参与实现。
+Studio 为 React + TypeScript + React Flow，富文本使用 Tiptap。Server 使用 Node.js + TypeScript + Fastify，数据库使用 Node 内置 SQLite，资产保存在 Server 文件目录。Worker 现使用 Python + asyncio + FastAPI/Uvicorn 接入服务，httpx 用于内部 ComfyUI；连接方向由 ADR-002 替代初始设计。旧 zhihua-service 不参与实现。
 
 Server Admin 使用 React + TypeScript；Electron Launcher 主进程管理独立的 Server 子进程，启动器的小型本地页面暂用 HTML/CSS/JS。Studio 与 Server 分别打包 Electron，关闭 Studio 不停止 Server。Server 可脱离 Electron 用 Node 运行。
 
