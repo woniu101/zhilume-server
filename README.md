@@ -71,6 +71,14 @@ npm test
 
 集成测试包含真实 Python Worker 子进程，默认要求相邻 `zhilume-worker` 已执行 `uv sync`。`ZHILUME_TEST_PYTHON` 可指定其他已安装 Worker 包的 Python。测试使用临时数据库和随机端口，不调用 GPU 或付费服务。
 
-Linux 服务使用同一源码和 Node 22.13+：`npm ci && npm run build && npm start`。可由 systemd 等进程管理器运行，数据目录必须可写。远程入口应由反向代理提供 HTTPS，并显式配置来源。**尚未进行 Linux、容器或云平台部署验收**。
+Linux 服务使用同一源码和 Node 22.13+：`npm ci && npm run build && npm start`。可由 systemd 等进程管理器运行，数据目录必须可写。远程入口应由反向代理提供 HTTPS，并显式配置来源。已在本机 WSL Ubuntu 22.04 完成 Linux 构建和 Server—Worker 集成验收；容器、公网与云平台部署尚未验收。
 
 本版不是完整首期验收，见 [开发记录](docs/development-status.md) 和 [PRD 快照](docs/prd.md)。
+
+Linux 可重复验收（同级准备三端仓库，Node 22.13+、uv 和 FFmpeg 可用）：
+
+```bash
+bash scripts/accept-linux.sh
+```
+
+脚本使用独立测试数据、随机本地端口和模拟 ComfyUI，不连接用户服务或加载模型。包含 Worker Python 3.12 安装、完整测试、Server 构建、任务回传、取消/重启重试，以及部署启动脚本的首次注册和身份复用。结果与边界见 [Linux 验收记录](docs/linux-acceptance.md)。

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
@@ -36,7 +36,7 @@ test("HTTP persistence, authorization, optimistic revision, immutable assets and
   let app = await createApp({ root, token });
   t.after(async () => {
     await app.close();
-    if (resolve(root).startsWith(resolve(tmpdir()) + "\\zhilume-server-test-"))
+    if (resolve(root).startsWith(resolve(tmpdir()) + sep + "zhilume-server-test-"))
       await rm(root, { recursive: true, force: true });
   });
   const req = (method: any, url: string, payload?: any) =>
@@ -212,7 +212,7 @@ test(
       if (child) await stop(child);
       await app.close();
       if (
-        resolve(root).startsWith(resolve(tmpdir()) + "\\zhilume-worker-test-")
+        resolve(root).startsWith(resolve(tmpdir()) + sep + "zhilume-worker-test-")
       )
         await rm(root, { recursive: true, force: true });
     });
