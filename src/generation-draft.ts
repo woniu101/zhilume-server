@@ -10,7 +10,8 @@ export function validateGenerationDraft(d: any) {
       !["ratio", "custom"].includes(d.sizeMode) || !["png", "rgba"].includes(d.format) ||
       !string(d.steps, 20) || !string(d.seed, 30) ||
       ![d.width, d.height].every(n => Number.isFinite(n) && Math.abs(n) <= 1000000) ||
-      !Array.isArray(d.refs) || d.refs.length > 16 || new Set(d.refs).size !== d.refs.length ||
+      // Upstream canvas references may exceed model limits. Preserve them for editing; jobs validate capability limits.
+      !Array.isArray(d.refs) || d.refs.length > 1000 || new Set(d.refs).size !== d.refs.length ||
       d.refs.some((id: unknown) => !string(id, 100) || !id) ||
       (d.request !== undefined && (!string(d.request?.fingerprint, 32000) || !string(d.request?.id, 100) || !d.request.id || !Number.isSafeInteger(d.request?.seed) || d.request.seed < 0)))
     throw new AppError("invalid_generation_draft", "生成草稿结构或长度不合法");

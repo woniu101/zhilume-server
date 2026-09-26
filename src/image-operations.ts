@@ -15,7 +15,7 @@ export function validateImageProfiles(value: unknown): any[] {
     if (!model || typeof p.profileId !== "string" || !/^[a-f0-9]{64}$/.test(p.profileId) || seen.has(p.profileId) ||
         p.workflowRevision !== model.workflowRevision || !Array.isArray(p.operations) || !p.operations.length ||
         p.operations.some((op: any) => !model.operations.includes(op)) ||
-        !Number.isInteger(p.maxReferences) || p.maxReferences < 0 || p.maxReferences > 16 ||
+        !Number.isInteger(p.maxReferences) || p.maxReferences < 0 || p.maxReferences > model.referenceLimits.maximum ||
         (p.modelId === "qwen-image-2512" && p.maxReferences !== 0) ||
         !Array.isArray(p.formats) || !p.formats.length || p.formats.some((f: any) => !model.formats.includes(f)) ||
         p.minSize !== 256 || !Number.isInteger(p.maxSize) || p.maxSize < 512 || p.maxSize > 2048 || p.maxSize % 32 || p.sizeStep !== 32 ||

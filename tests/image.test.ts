@@ -15,6 +15,8 @@ test('profile validation, scheduling isolation, reference count and dimensions',
   const profile = { modelId: model.id, profileId: 'a'.repeat(64), workflowRevision: model.workflowRevision, operations: model.operations,
     maxReferences: 4, formats: model.formats, minSize: 256, maxSize: 1536, sizeStep: 32, referenceResolution: 1024, defaultSteps: 25, maxSteps: 100, validation: 'unverified' };
   assert.equal(validateImageProfiles([profile]).length, 1);
+  assert.equal(validateImageProfiles([{ ...profile, maxReferences: 10 }]).length, 1);
+  assert.throws(() => validateImageProfiles([{ ...profile, maxReferences: 11 }]));
   assert.throws(() => validateImageProfiles([{ ...profile, validation: 'verified' }]));
   const w = { connected: true, lastHeartbeat: Date.now(), imageProfiles: [profile] };
   const input = { modelId: model.id, profileId: profile.profileId, workflowRevision: model.workflowRevision, prompt: '绘制', negativePrompt: '', referenceAssetIds: ['a', 'b'], steps: 25, seed: 0, outputFormat: 'png' };

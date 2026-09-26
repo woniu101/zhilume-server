@@ -59,7 +59,7 @@ viewport 的 zoom 限制 0.15–2.5。Folder PATCH 校验所属项目与祖先�
 
 ## 图片操作与执行配置
 
-契约快照版本 2.0.0。Qwen Image 2512 仅支持 `image.generate.v1`；2.1 另支持 `image.edit.v1` 与 `image.reference.v1`。模型状态仍为 `awaiting_gpu_validation`，这与在线可试运行状态相互独立。
+传输协议 2.0.0、操作目录 1.4.0。Qwen Image 2512 仅支持 `image.generate.v1`；2.1 另支持 `image.edit.v1` 与 `image.reference.v1`。模型状态仍为 `awaiting_gpu_validation`，这与在线可试运行状态相互独立。
 
 hello.imageProfiles 为公开配置数组：modelId、profileId（64 位 SHA-256）、workflowRevision、operations、maxReferences、formats、minSize=256、maxSize<=2048、sizeStep=32、referenceResolution、defaultSteps、maxSteps=100、validation=unverified。Worker 仅在明确启用并通过只读节点/模型检查后发布。Server 按操作、模型、配置指纹与工作流版本共同调度，不能只按 image.generate 匹配。
 
@@ -110,3 +110,10 @@ Electron IPC：media.create(assetId,operation,{start,end})、run(id)、cancel(id
 共享源码仅在 packages/media；`npm run media:sync -- ../zhilume-studio` 生成相同 tgz，分别 npm install 刷新锁文件。后续改动递增包版本。两端完整解包 ffmpeg-static 目录与许可证，Web dist 无 WASM。初版 Windows x64 发布，其他平台依赖按目标平台安装构建，不混用 Windows 二进制。
 
 Electron 图片工具使用 createSource(assetId) / readImage(id) 读取上限 64 MiB 的原图字节；复用相同本地路径校验、远程缓存、下载进度与取消机制。图像像素处理留在 renderer Canvas，不调用 FFmpeg。读取会话由 dispose(id) 释放。
+
+
+## 创作面板能力约束（目录 1.4.0）
+
+GET /image-models 的每个模型返回 referenceLimits.maximum（2512 为 0、2.1 为 10），表示模型能力边界；profiles[].maxReferences 表示当前运行配置边界，Server 与 Worker 拒绝超过模型上限的配置。客户端新增引用取两者最小值，离线最多准备 10 张，提交仍须匹配在线配置。
+
+草稿与可执行请求分开校验：上游画布可能超过模型引用限制，generationDraft.refs 允许最多 1000 个唯一 ID（与画布节点数上限一致），保留超限引用供移除；UI 明确阻止超限任务，不能因为此草稿导致整个项目无法保存。普通添加入口不允许超出当前能力数量。任务的操作、输入顺序、尺寸/透明通道校验和幂等请求身份不变；本轮不新增任务状态。

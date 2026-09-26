@@ -10,6 +10,8 @@ test("generation drafts retain incomplete fields while rejecting oversized or ma
   assert.doesNotThrow(() => validateCanvas(document(draft)));
   assert.throws(() => validateCanvas(document({ ...draft, prompt: "x".repeat(12001) })), /草稿/);
   assert.throws(() => validateCanvas(document({ ...draft, refs: ["a", "a"] })), /草稿/);
+  assert.doesNotThrow(() => validateCanvas(document({ ...draft, refs: Array.from({ length: 11 }, (_, i) => String(i)) })));
+  assert.throws(() => validateCanvas(document({ ...draft, refs: Array.from({ length: 1001 }, (_, i) => String(i)) })), /草稿/);
   assert.throws(() => validateCanvas(document({ ...draft, request: { id: "retry", seed: -1, fingerprint: "x" } })), /草稿/);
 });
 
