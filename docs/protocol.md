@@ -7,7 +7,7 @@
 1. Worker 启动受鉴权接入服务，默认 127.0.0.1:4320；本机 --show-token 显示独立接入密钥。无需 Server 地址。
 2. 管理员 POST /api/v1/workers/probe 测试 {address,credential}；POST /api/v1/workers 保存，可附 name。GET /workers 不返回密钥。
 3. Server 主动请求 Worker /api/v1/system，校验 workerId 和协议 2.0；主动建立 /api/v1/connect WebSocket，Authorization Bearer 与 X-Zhilume-Server-Id 通过请求头传递。
-4. Worker 首次鉴权连接绑定 Server 身份；其他 Server 拒绝接入。hello 包含 workerId、capabilities、imageProfiles、activeAttempts；Server welcome 后允许接单。
+4. Worker 首次鉴权连接绑定 Server 身份；其他 Server 拒绝接入。hello 包含 workerId、capabilities、imageProfiles、speechProfiles、activeAttempts；Server welcome 后允许接单。
 5. Server 管理持久连接及退避重连；Worker 10 秒心跳，默认 90 秒租约。停用断开连接；排空不接新任务。
 
 ## 一次任务
@@ -117,3 +117,14 @@ Electron 图片工具使用 createSource(assetId) / readImage(id) 读取上限 6
 GET /image-models 的每个模型返回 referenceLimits.maximum（2512 为 0、2.1 为 10），表示模型能力边界；profiles[].maxReferences 表示当前运行配置边界，Server 与 Worker 拒绝超过模型上限的配置。客户端新增引用取两者最小值，离线最多准备 10 张，提交仍须匹配在线配置。
 
 草稿与可执行请求分开校验：上游画布可能超过模型引用限制，generationDraft.refs 允许最多 1000 个唯一 ID（与画布节点数上限一致），保留超限引用供移除；UI 明确阻止超限任务，不能因为此草稿导致整个项目无法保存。普通添加入口不允许超出当前能力数量。任务的操作、输入顺序、尺寸/透明通道校验和幂等请求身份不变；本轮不新增任务状态。
+
+
+## 语音生成（目录 1.5.0，wire protocol 仍为 2.0）
+
+GET `/speech-models` 返回模型边界和在线 profiles。hello.speechProfiles 包含 modelId、64 位 profileId、workflowRevision、upstreamRevision、maxTextCharacters、languages、emotionModes、validation=unverified。指纹包含部署路径/配置和工作流、上游提交版本，不是权重内容哈希。仅启用并通过文件预检后声明 audio.speech.v1；Server 按完全相同的模型/配置/工作流调度。
+
+POST `/jobs` operation=audio.speech.v1，input 为 `{modelId,profileId,workflowRevision,text,language,speed,speaker:{assetId,start,end},emotionMode,emotionAlpha,emotionReference:{assetId,start,end},emotionText,emotionVector:[8个0..1数值]}`。speaker 必填，emotionReference 仅 reference 模式必填；text 模式需描述，vector 模式需向量。Server 将未启用模式的字段归一化，补齐有序去重 referenceAssetIds 与 outputFormat=wav；同一素材可在两个角色使用不同片段。派发附 referenceAssets，沿用现有受鉴权输入上传，不要求 Server 公网可访问。
+
+data.speechDraft 保存未完成语音表单与可选 request={id,fingerprint}；允许空音频 ID、空文本、不完整片段，长文本草稿上限 100000 字，实际提交上限来自 profile 且最多 1000。界面保留超限输入供调整，禁止静默截断。复制节点清除 request；失败重提相同参数复用请求 ID。Server 重试重新校验在线配置和资产。
+
+任务状态沿用 queued/assigned/running/cancel_requested/succeeded/failed/cancelled/interrupted，executor=worker。进度阶段为准备音色与情绪参考、加载 IndexTTS 并合成语音、校验语音结果，progress=null；结果经校验与归档才成功。Worker 取消/超时先结束所持有子进程再回报；推理失败为 failed，详细原因保留在本地 attempts/<attemptId>/speech.log。来源素材和规范化参数归档至 provenance。普通视频截取/抽音轨仍走 Studio/Server CPU 模块。

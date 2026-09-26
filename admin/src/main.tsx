@@ -295,7 +295,7 @@ function App() {
                 <section className="admin-card">
                   <div className="card-heading">
                     <h2>最近 200 个任务</h2>
-                    <span className="badge">GPU 图片 / CPU 处理 / 模拟</span>
+                    <span className="badge">GPU 图片与语音 / CPU 处理 / 模拟</span>
                   </div>
                   <JobTable
                     jobs={jobs}
@@ -547,9 +547,9 @@ function JobTable({
             <tr key={j.id}>
               <td>
                 <strong>
-                  {[...catalog.imageOperations, ...catalog.media].find(op => op.id === j.operation)?.name || (j.operation === "mock.text.echo.v1" ? "文本回显" : j.operation === "mock.media.copy.v1" ? "素材复制" : j.operation)}
+                  {[...catalog.imageOperations, ...catalog.speechOperations, ...catalog.media].find(op => op.id === j.operation)?.name || (j.operation === "mock.text.echo.v1" ? "文本回显" : j.operation === "mock.media.copy.v1" ? "素材复制" : j.operation)}
                 </strong>
-                <small>{j.id.slice(0, 8)} · {j.simulation ? "模拟" : j.operation.startsWith("image.") ? "GPU 图片" : "CPU 处理"}</small>
+                <small>{j.id.slice(0, 8)} · {j.simulation ? "模拟" : j.operation === "audio.speech.v1" ? "GPU 语音" : j.operation.startsWith("image.") ? "GPU 图片" : "CPU 处理"}</small>
               </td>
               <td>
                 {projects.find((p) => p.id === j.projectId)?.name ||

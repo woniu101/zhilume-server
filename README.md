@@ -1,6 +1,6 @@
 # Zhilume Server
 
-独立服务、Web 管理台与 Windows 启动器。当前 0.7.1 初版，配套 Studio 0.10.0 / Worker 0.6.1。支持图片任务调度、CPU 媒体处理和模拟能力。上海二 A 5090 的真实 Qwen 2512 / 2.1 图片执行与 Server 主动连接链路已完成样本验收，见 [云端报告](docs/cloud-acceptance-2026-09-26.md)。
+独立服务、Web 管理台与 Windows 启动器。当前 0.8.0 初版，配套 Studio 0.11.0 / Worker 0.7.0。支持 IndexTTS 语音及图片任务调度、CPU 媒体处理和模拟能力。上海二 A 5090 的真实 Qwen 2512 / 2.1 图片执行与 Server 主动连接链路已完成样本验收，见 [云端报告](docs/cloud-acceptance-2026-09-26.md)。
 
 - `/api/v1/image-models` 返回 Qwen 2512 / 2.1 目录及在线执行配置；未显式启用图片 Worker 时不能提交 GPU 任务。
 - 调度按模型、配置指纹、工作流版本和操作匹配，保留多图顺序与结果 provenance。
@@ -88,3 +88,5 @@ bash scripts/accept-linux.sh
 ```
 
 脚本使用独立测试数据、随机本地端口和模拟 ComfyUI，不连接用户服务或加载模型。包含 Worker Python 3.12 安装、完整测试、Server 构建、任务回传、取消/重启重试，以及部署启动脚本的首次注册和身份复用。结果与边界见 [Linux 验收记录](docs/linux-acceptance.md)。
+
+IndexTTS 2.5 接口、任务执行适配与本机替身链路测试已完成；真实 GPU 推理尚未验收，不等同于此前 Qwen 样本结论。

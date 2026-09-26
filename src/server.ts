@@ -27,7 +27,8 @@ import {
 } from "./domain.js";
 import { mediaCapabilities, validateMediaInput, validateProvenance } from "./media-operations.js";
 import { imageCapabilities, isImageOperation, modelAvailability, validateImageInput, validateImageProfiles, supportsImageJob } from "./image-operations.js";
-const executableCapabilities = [...capabilities, ...mediaCapabilities, ...imageCapabilities];
+import { speechCapabilities, isSpeechOperation, speechAvailability, validateSpeechInput, validateSpeechProfiles, supportsSpeechJob } from './speech-operations.js';
+const executableCapabilities = [...capabilities, ...mediaCapabilities, ...imageCapabilities, ...speechCapabilities];
 const executableOperations = executableCapabilities.map(c => c.id);
 import type { WebSocket } from "ws";
 
@@ -463,6 +464,7 @@ export async function createApp(options: Options) {
         ),
     }));
   });
+  app.get("/api/v1/speech-models", async (req) => { owner(req); return speechAvailability(store.all("worker")); });
   app.get("/api/v1/image-models", async (req) => { owner(req); return modelAvailability(store.all("worker")); });
   app.get("/api/v1/jobs", async (req: any) => {
     owner(req);
@@ -515,7 +517,9 @@ export async function createApp(options: Options) {
       : null;
     if (b.nodeId && !node)
       throw new AppError("node_missing", "请先保存画布节点");
-    const input = isImageOperation(b.operation)
+    const input = isSpeechOperation(b.operation)
+      ? validateSpeechInput(b.input, store.all("worker"), id => store.get("asset", id))
+      : isImageOperation(b.operation)
       ? validateImageInput(b.operation, b.input, store.all("worker"), id => store.get("asset", id))
       : b.operation.startsWith("media.")
       ? validateMediaInput(b.operation, b.input, requireValue(store.get("asset", b.input?.assetId), "输入素材不存在"))
@@ -586,6 +590,7 @@ export async function createApp(options: Options) {
     getProject(j.projectId, true);
     if (!["failed", "interrupted"].includes(j.status))
       throw new AppError("retry_not_allowed", "仅失败或中断任务可以重试", 409);
+    if (isSpeechOperation(j.operation)) validateSpeechInput(j.input, store.all("worker"), id => store.get("asset", id));
     if (isImageOperation(j.operation)) validateImageInput(j.operation, j.input, store.all("worker"), id => store.get("asset", id));
     j.attempts.push({
       attemptId: j.attemptId,
@@ -720,7 +725,7 @@ export async function createApp(options: Options) {
       if (!response.body) throw new AppError("invalid_output", "输出为空");
       const a = await assets.ingest(Readable.fromWeb(response.body as any), filename, {
         staged: true, workerId: job.workerId, attemptId: job.attemptId, jobId: job.id,
-        provenance: isImageOperation(job.operation) ? { operation: job.operation, sourceAssetIds: job.input.referenceAssetIds, parameters: Object.fromEntries(Object.entries(job.input).filter(([key]) => key !== "referenceAssetIds")) } : job.input.assetId ? { operation: job.operation, sourceAssetIds: [job.input.assetId], parameters: { start: job.input.start, end: job.input.end } } : undefined,
+        provenance: (isImageOperation(job.operation) || isSpeechOperation(job.operation)) ? { operation: job.operation, sourceAssetIds: job.input.referenceAssetIds, parameters: Object.fromEntries(Object.entries(job.input).filter(([key]) => key !== "referenceAssetIds")) } : job.input.assetId ? { operation: job.operation, sourceAssetIds: [job.input.assetId], parameters: { start: job.input.start, end: job.input.end } } : undefined,
       }, { size: result.size, sha256: result.sha256 });
       assertLive(job);
       if (a.size !== result.size || a.sha256 !== result.sha256) throw new AppError("invalid_output", "结果内容校验失败");
@@ -762,7 +767,7 @@ export async function createApp(options: Options) {
             peers.get(w.id)?.readyState === 1 &&
             Date.now() - w.lastHeartbeat < 40000 &&
             w.capabilities.includes(job.operation) &&
-            supportsImageJob(w, job) &&
+            supportsImageJob(w, job) && supportsSpeechJob(w, job) &&
             !store
               .all("job")
               .some(
@@ -788,7 +793,7 @@ export async function createApp(options: Options) {
               requireValue(store.get("asset", job.input.assetId)),
             ),
           }
-        : isImageOperation(job.operation)
+        : (isImageOperation(job.operation) || isSpeechOperation(job.operation))
           ? { ...job.input, referenceAssets: job.input.referenceAssetIds.map((id: string) => publicAsset(requireValue(store.get("asset", id)))) }
           : job.input;
       send(
@@ -830,14 +835,15 @@ export async function createApp(options: Options) {
           )
             throw new AppError("invalid_capabilities", "能力声明无效");
           const imageProfiles = validateImageProfiles(msg.payload.imageProfiles);
+          const speechProfiles = validateSpeechProfiles(msg.payload.speechProfiles);
           welcomed = true;
           clearTimeout(handshakeTimeout);
           Object.assign(w, {
             connected: true,
             lastHeartbeat: Date.now(),
-            imageProfiles,
+            imageProfiles, speechProfiles,
             capabilities: msg.payload.capabilities.filter((s: string) =>
-              !s.startsWith('media.') && executableOperations.includes(s) && (!isImageOperation(s) || imageProfiles.some(p => p.operations.includes(s))),
+              !s.startsWith('media.') && executableOperations.includes(s) && (!isImageOperation(s) || imageProfiles.some(p => p.operations.includes(s))) && (!isSpeechOperation(s) || speechProfiles.length > 0),
             ),
           });
           store.put("worker", w);
@@ -971,6 +977,7 @@ export async function createApp(options: Options) {
           )
             throw new AppError("invalid_output", "结果归属或校验不匹配");
           if (
+            (isSpeechOperation(j.operation) && (a.kind !== "audio" || !a.filename.toLowerCase().endsWith(".wav"))) ||
             (isImageOperation(j.operation) && (a.kind !== "image" || !a.filename.toLowerCase().endsWith(".png"))) ||
             (j.operation === operations[0] && a.kind !== "text") ||
             (j.operation === operations[1] &&

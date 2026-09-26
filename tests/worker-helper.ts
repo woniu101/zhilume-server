@@ -4,12 +4,12 @@ import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { join, resolve } from 'node:path';
 
-export async function startWorker(state: string, args: string[] = [], port?: number, launcher = false) {
+export async function startWorker(state: string, args: string[] = [], port?: number, launcher = false, testEntry?: string) {
   if (!port) { const listener = createServer(); listener.listen(0, '127.0.0.1'); await once(listener, 'listening'); port = (listener.address() as any).port; await new Promise<void>(r => listener.close(() => r())); }
   const python = process.env.ZHILUME_TEST_PYTHON || resolve('../zhilume-worker/.venv/' + (process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'));
   const child = launcher
     ? spawn('bash', ['deploy/run.sh'], { cwd: resolve('../zhilume-worker'), env: { ...process.env, ZHILUME_STATE: state, ZHILUME_HOST: '127.0.0.1', ZHILUME_PORT: String(port), ZHILUME_ENABLE_IMAGE: '0' }, stdio: ['ignore', 'ignore', 'pipe'] })
-    : spawn(python, ['-m', 'zhilume_worker', '--port', String(port), '--state', state, ...args], { cwd: resolve('../zhilume-worker'), windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+    : spawn(python, [...(testEntry ? [testEntry] : ['-m', 'zhilume_worker']), '--port', String(port), '--state', state, ...args], { cwd: resolve('../zhilume-worker'), windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
   let log = ''; child.stderr?.on('data', b => { log = (log + b.toString()).slice(-2500); });
   const address = `http://127.0.0.1:${port}`;
   for (let i = 0; i < 300; i++) {
