@@ -11,6 +11,7 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { WorkerTransport, endpoint, probeWorker } from "./worker-transport.js";
 import { workerStatus } from "./worker-status.js";
+import { ServerMediaQueue } from './media-queue.js';
 import { Store } from "./store.js";
 import { Assets } from "./assets.js";
 import {
@@ -36,6 +37,7 @@ export interface Options {
   logger?: boolean;
   tickMs?: number;
   leaseMs?: number;
+  mediaExecutable?: string;
 }
 const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -110,6 +112,7 @@ export async function createApp(options: Options) {
     emit("job.changed", { id: job.id });
     return job;
   };
+  const mediaQueue = new ServerMediaQueue(store, assets, saveJob, options.mediaExecutable);
   const pendingTransfers = new Set<Promise<any>>();
   const uploads = new Set<string>(), downloads = new Set<string>();
   const transport = new WorkerTransport(options.root, (workerId, lastError) => {
@@ -284,12 +287,21 @@ export async function createApp(options: Options) {
       owner(req);
       if (!req.body?.pipe)
         throw new AppError("invalid_body", "使用二进制文件上传");
+      const syncId = req.headers['x-media-sync-id'];
+      if (syncId !== undefined && (typeof syncId !== 'string' || !/^[a-f0-9-]{36}$/.test(syncId)))
+        throw new AppError('invalid_sync_id', '媒体同步标识无效');
+      const existing = syncId && store.all('asset').find(a => a.syncId === syncId && !a.staged);
+      if (existing) { req.body.resume(); return reply.code(200).send(publicAsset(existing)); }
+      if (syncId && uploads.has(syncId)) throw new AppError('sync_busy', '此结果正在同步，请稍后重试', 409);
+      if (syncId) uploads.add(syncId);
+      try {
       const asset = await assets.ingest(
         req.body,
         text(req.query.filename, 255),
-        { provenance: validateProvenance(req.headers["x-asset-provenance"], id => store.get("asset", id)) },
+        { ...(syncId ? { syncId } : {}), provenance: validateProvenance(req.headers["x-asset-provenance"], id => store.get("asset", id)) },
       );
       return reply.code(201).send(publicAsset(asset));
+      } finally { if (syncId) uploads.delete(syncId); }
     },
   );
   app.get("/api/v1/assets", async (req) => {
@@ -439,7 +451,8 @@ export async function createApp(options: Options) {
     owner(req);
     return executableCapabilities.map((c) => ({
       ...c,
-      ready: store
+      executor: c.id.startsWith('media.') ? 'server' : 'worker',
+      ready: c.id.startsWith('media.') ? mediaQueue.ready : store
         .all("worker")
         .some(
           (w) =>
@@ -528,9 +541,10 @@ export async function createApp(options: Options) {
       projectId: project.id,
       nodeId: b.nodeId || null,
       operation: b.operation,
+      executor: b.operation.startsWith('media.') ? 'server' : 'worker',
       input,
       status: "queued",
-      stage: "等待执行端",
+      stage: b.operation.startsWith('media.') ? '等待 Server 媒体队列' : '等待执行端',
       progress: null,
       simulation: b.operation.startsWith("mock."),
       attemptId: id(),
@@ -543,7 +557,9 @@ export async function createApp(options: Options) {
       sourceRevision: b.sourceRevision,
       outputAssetId: null,
       error: null,
+      errorCode: null,
     };
+    if (job.executor === 'server' && !mediaQueue.ready) throw new AppError('ffmpeg_unavailable', 'Server 内置 FFmpeg 不可用，请检查安装包', 503);
     saveJob(job);
     schedule();
     return reply.code(201).send(publicJob(job));
@@ -560,6 +576,7 @@ export async function createApp(options: Options) {
       job.status = "cancel_requested";
       job.stage = "等待停止确认";
       send(job.workerId, "task.cancel", {}, job);
+      if (job.executor === 'server') mediaQueue.cancel(job.id);
     }
     return publicJob(saveJob(job));
   });
@@ -579,7 +596,7 @@ export async function createApp(options: Options) {
     });
     Object.assign(j, {
       status: "queued",
-      stage: "等待执行端",
+      stage: j.executor === 'server' ? '等待 Server 媒体队列' : '等待执行端',
       attemptId: id(),
       leaseId: null,
       leaseExpires: 0,
@@ -587,6 +604,7 @@ export async function createApp(options: Options) {
       progress: null,
       sequence: 0,
       error: null,
+      errorCode: null,
       outputAssetId: null,
     });
     saveJob(j);
@@ -711,9 +729,10 @@ export async function createApp(options: Options) {
   }
   function schedule() {
     if (closed) return;
+    mediaQueue.pump();
     for (const job of store.all("job"))
       if (
-        ["assigned", "running", "cancel_requested"].includes(job.status) &&
+        job.executor === 'worker' && ["assigned", "running", "cancel_requested"].includes(job.status) &&
         job.leaseExpires < Date.now()
       ) {
         send(job.workerId, "task.cancel", {}, job);
@@ -731,7 +750,7 @@ export async function createApp(options: Options) {
       }
     for (const job of store
       .all("job")
-      .filter((j) => j.status === "queued")
+      .filter((j) => j.status === "queued" && j.executor === 'worker')
       .reverse()) {
       const worker = store
         .all("worker")
@@ -818,7 +837,7 @@ export async function createApp(options: Options) {
             lastHeartbeat: Date.now(),
             imageProfiles,
             capabilities: msg.payload.capabilities.filter((s: string) =>
-              executableOperations.includes(s) && (!isImageOperation(s) || imageProfiles.some(p => p.operations.includes(s))),
+              !s.startsWith('media.') && executableOperations.includes(s) && (!isImageOperation(s) || imageProfiles.some(p => p.operations.includes(s))),
             ),
           });
           store.put("worker", w);
@@ -953,8 +972,6 @@ export async function createApp(options: Options) {
             throw new AppError("invalid_output", "结果归属或校验不匹配");
           if (
             (isImageOperation(j.operation) && (a.kind !== "image" || !a.filename.toLowerCase().endsWith(".png"))) ||
-            (j.operation === "media.video.trim.v1" && a.kind !== "video") ||
-            (j.operation === "media.audio.extract.v1" && a.kind !== "audio") ||
             (j.operation === operations[0] && a.kind !== "text") ||
             (j.operation === operations[1] &&
               (a.kind !== store.get("asset", j.input.assetId)!.kind ||
@@ -1013,6 +1030,7 @@ export async function createApp(options: Options) {
     closed = true;
     clearInterval(timer);
     transport.close();
+    await mediaQueue.close();
     for (const s of peers.values()) s.terminate();
     await Promise.allSettled([...pendingTransfers]);
     for (const s of events) s.close();

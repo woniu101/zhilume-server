@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.17 |
+| 文档版本 | v0.18 |
 | 编写日期 | 2026-09-26 |
 | 文档用途 | 指导三端开发、接口设计与验收 |
 | 当前状态 | 视觉方向已确认，进入首期开发；实现进度另见开发记录 |
@@ -26,14 +26,14 @@
 
 1. Zhilume，中文名“织镜”，面向 AI 图片、视频、音频创作，以画布组织文本、素材、参考关系和创作结果。
 2. Studio 参考 Updream 的基础节点与画布交互，当前范围为文本、图片、视频、音频四类节点以及素材管理。
-3. 当前开发图片裁剪、拼图、宫格切分、视频截取与抽音轨，打通本机和 CPU Worker 的真实文件处理。Qwen Image 2512 与 2.1 同期纳入能力设计，GPU 实测前告知用户。
+3. 当前开发图片裁剪、拼图、宫格切分、视频截取与抽音轨，图片本地处理，视频 Web 走 Server、Electron 走本机。Qwen Image 2512 与 2.1 同期纳入能力设计，GPU 实测前告知用户。
 4. Agent 节点、Agent 系统等在整体产品成熟后再考虑。
 5. Studio 从开始支持 Web 和桌面可执行程序两种发布形态。
 6. Server 独立于 Studio，支持服务部署和面向普通用户的可执行程序，并提供 Web 管理后台。
 7. 生成后端由自主部署的 Server、Worker 承担。Worker 可部署到优云智算、AutoDL、其他 GPU 平台或用户自己的 GPU 主机。
 8. 三个独立仓库、独立发布；Studio 不直接调用 Worker，Server 不承担 GPU 模型推理。
 9. Studio 采用 React、TypeScript、Electron；Server 核心采用 Node.js、TypeScript，管理界面采用 React、TypeScript，桌面启动器采用 Electron。
-10. Worker 采用 Python、`asyncio` 和 FastAPI/Uvicorn 接入层，运行 CPU 媒体执行器并保留显式模拟能力。Server 主动连接 Worker，执行核心与 HTTP/WebSocket 路由分离。
+10. Worker 采用 Python、`asyncio` 和 FastAPI/Uvicorn 接入层，运行 GPU 生成执行器并保留显式模拟能力。Server 主动连接 Worker，执行核心与 HTTP/WebSocket 路由分离。
 11. Server 主动连接 Worker；Server 不需要公网地址。网络可达性由用户自行解决，不实现 SSH 隧道、组网或中继，也不提供配套工具入口或配置示例。
 12. 优先本地开发三端流程，再进行远程 Worker 联调，最后按选定范围接入真实生成能力。
 13. Studio 与 Server 首期支持深色、浅色和跟随系统。已确认视觉为“中性黑白灰主体＋少量雾蓝强调”，不采用大面积蓝色界面。
@@ -71,8 +71,8 @@
 | S03 | 基础内容 | 文本编辑、图片预览、视频播放、音频波形与播放、替换、下载 |
 | S04 | 素材 | 本地上传、当前画布选取、项目素材库、文件夹、筛选、搜索、属性与双向复用 |
 | S05 | Server | 项目／画布存储、资产存储、任务记录、简单调度、能力目录、管理后台 |
-| S06 | Worker | 接入服务、认证、心跳、CPU 视频处理、模拟执行、进度、取消、输入输出传输 |
-| S10 | 媒体工具 | 原图裁剪、宫格切分、多图拼图；本机 FFmpeg / Web WASM / CPU Worker 视频截取和抽音轨 |
+| S06 | Worker | 接入服务、认证、心跳、GPU 图片执行、模拟执行、进度、取消、输入输出传输 |
+| S10 | 媒体工具 | 原图裁剪、宫格切分、多图拼图；共享 FFmpeg 模块，Web 由 Server 单并发处理，Electron 本机处理 |
 | S11 | 图片执行 | 2512 文生图、2.1 文生图/指令编辑/多图参考：独立能力、配置调度、ComfyUI 工作流；GPU 待验收 |
 | S07 | 发布 | Studio Web／Windows 桌面版；Server 无界面服务／Windows 启动器；Worker 命令行 |
 | S08 | 可靠性 | 幂等提交、任务恢复与失联处理、上传失败处理、资产归档、保存冲突提示 |
@@ -101,11 +101,15 @@
 
 - 图片：浏览器 Canvas 读取原图像素，裁剪支持框选和精确坐标；宫格最多 8 × 8，余数像素分摊到边缘；拼图最多 16 张，可选顺序、列数、格尺寸、间距和背景色，保持每张图片完整比例。
 - 拼图原图合计最多 6400 万像素；单张原图/输出最多 3200 万像素，输出边长最多 16384。拼图单格 64–2048 px、间隔 0–100 px；输出 PNG。
-- 桌面视频：独立 FFmpeg 子进程，输入/输出各限 1 GB，输入分块传输，取消停止进程。截取重新编码 MP4 H.264/AAC，抽音轨输出 PCM WAV。
-- Web 视频：按需加载同源单线程 ffmpeg.wasm；第一版保守限制输入 64 MB、原视频时长 120 秒、执行超时 180 秒。这是产品保护限制，不代表已完成上限压力验收。超过限制可显式选择在线 CPU Worker 或桌面版。
-- CPU Worker：接收 Server 分配的视频任务，输入校验、后台 FFmpeg、进度、取消、输出下载、归档使用统一租约协议，不申请 GPU。没有安装 FFmpeg 时不发布媒体能力。
-- 工具先处理后预览，再保存为新素材、新节点，或对同类型单结果替换当前节点。原始资产不改写，画布修改可撤销，宫格输出作为一次画布操作插入。
-- 每个结果保存来源资产 ID、操作标识、参数、输出序号；远程结果保存任务 ID。上传失败时保留窗口中的 Blob，重试跳过已成功上传的结果，也可下载保存。关闭窗口/进程不承诺恢复尚未保存的处理结果。
+- 视频固定执行位置：Studio Web 提交 Server 后台任务，Studio Electron 主进程管理本机 FFmpeg 子进程。普通媒体不依赖 Worker 或 GPU，不提供自动选址、用户选址、Web 本地服务或 FFmpeg WASM。
+- Server 与 Electron 复用 `@zhilume/media`。唯一源码位于 Server `packages/media`，通过版本化 npm tgz 发布到两个独立仓库，统一校验、格式、进度、取消和错误处理。
+- 输入与输出各限 1 GiB，0 ≤ start < end ≤ 实际视频时长，最多 86400 秒。截取精确重编码 MP4 H.264/AAC；抽音轨输出 WAV PCM s16le；无音轨返回 `no_audio`。原素材保持不变。
+- 发布包内置对应平台 FFmpeg，用户无需安装。初版提供 Windows x64 EXE，其他平台须对应构建验收。Server 固定媒体并发 1，关闭页面不影响后台任务。任务进度与项目管理请求独立。
+- Electron 的图片和视频工具优先直接读取已导入本地原文件，经大小/SHA-256 校验后使用原路径；文件改变、移走或只存于远程 Server 时，下载到内容寻址缓存并显示下载进度。输出由主进程流式同步到 Server，再插入新节点。
+- 桌面阶段：validating → downloading（按需）→ processing → syncing → succeeded；错误为 failed / sync_failed，取消为 cancelled。同步失败保留输出，重试仅上传，不重新转码；同步幂等标识防止重复资产。不承诺应用退出后恢复未同步结果。
+- Web 状态：queued → running → succeeded / failed；运行中取消先为 cancel_requested，子进程退出后 cancelled；Server 停止或重启使活动任务 interrupted，可手动重试，排队任务恢复继续。真实 FFmpeg 进度，归档成功才显示完成。
+- Electron 原图读取上限 64 MiB，图片仍在 renderer Canvas 处理；Web 图片仍在浏览器本地处理。图片预览后保存新节点或替换同类型结果；失败保留 Blob，可重试或下载。宫格一次插入，原资产不改写，画布操作可撤销。
+- 结果保存来源资产 ID、操作、参数；图片宫格另存输出序号，Web 视频结果附 Job ID。
 - 2512 只支持文生图，不混同 Edit2511；2.1 纳入文生图、指令编辑、多图参考和 RGBA。操作与模型分开，参考顺序必须保留；不支持的参数明确报错，不静默丢弃。
 - `/image-models` 返回模型目录与在线执行配置。Worker 显式启用并通过只读检查后可试运行；模型仍标记 `awaiting_gpu_validation`，不将节点/文件存在当作推理验收。调度必须匹配 modelId、profileId、workflowRevision 和 operation；参考上限与尺寸来自执行配置，GPU 阶段单独验收。
 
@@ -128,7 +132,7 @@ Studio Web / Studio Desktop
        Zhilume Worker
        ├─ asyncio 控制程序
        ├─ 模拟执行适配器（首期）
-       └─ ComfyUI / Python / 媒体工具适配器（后续）
+       └─ ComfyUI / Python 生成执行器
 ```
 
 - Studio 仅保存 Server 地址、登录凭证和可清理的本地缓存，不成为长期素材唯一副本。

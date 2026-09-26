@@ -1,8 +1,17 @@
 # 开发与验收记录
 
-日期：2026-09-26。当前 Studio 0.8.0 / Server 0.6.0 / Worker 0.5.0。旧 zhihua-service 只作能力参考，当前为初版，需要时直接重构，不保留历史兼容层。
+日期：2026-09-26。当前 Studio 0.9.0 / Server 0.7.0 / Worker 0.6.0。旧 zhihua-service 只作能力参考，当前为初版，需要时直接重构，不保留历史兼容层。
 
-## 上海二 A 5090 实测（本轮）
+## 媒体执行架构重构
+
+- Web 视频工具提交 Server 后台单并发任务，Electron 主进程调用随包 FFmpeg；共享 `@zhilume/media` 0.1.0，源码在 packages/media，两个仓库安装同一 tgz。已移除浏览器 WASM、Worker 视频执行器、处理位置选择器。
+- 本地视频按原文件大小/哈希校验后直读；远程文件下载到校验缓存并显示进度，输出流式同步项目。同步失败仅重传输出，X-Media-Sync-Id 确保重复请求不重复入库。
+- Server 支持无 Worker 时处理、队列并发 1、排队/运行取消、关闭中断与重试；errorCode 与 executor 在任务接口公开。图片继续 Canvas 本地处理。
+- Windows 原生 EXE 实测远程视频抽音轨、本地文件选择导入/直读截取，生成音频与视频新节点并保存。打包后的 Server 进程也完成 0.5–1.5 秒截取和抽音轨，两条路径没有在线 Worker。
+- 最终 EXE 补验远程图片下载缓存、Canvas 裁剪预览和保存新节点；图片本地原文件直读有字节一致性测试。
+- 两端 asar 内共享模块 SHA-256 相同，包含 FFmpeg 可执行文件和对应许可证，未包含 WASM。详见 [媒体验收](media-acceptance-2026-09-26.md)。
+
+## 上海二 A 5090 实测（媒体重构前）
 
 - 创建单卡 5090、14 vCPU / 48 GiB 实例；六个 Qwen 文件直接链接公共 `/model`，本机不运行 ComfyUI，不下载权重。
 - 固定官方 ComfyUI 提交及 PyTorch attention 启动脚本，解决基础镜像缺少 Qwen 2.1 节点、xFormers 不支持 5090 对应路径的问题。仅使用内置节点。

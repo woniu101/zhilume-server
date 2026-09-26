@@ -1,0 +1,9 @@
+{
+  "name": "@zhilume/media",
+  "version": "0.1.0",
+  "description": "Shared native media execution for Zhilume Server and Studio Electron",
+  "main": "index.cjs",
+  "types": "index.d.cts",
+  "files": ["index.cjs", "index.d.cts"],
+  "engines": { "node": ">=22" }
+}

@@ -2,11 +2,10 @@ import { createApp } from '../dist/server.js';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { randomUUID, createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
 const mode = process.argv[2];
-const allowed = ['cpu', '2512', '2512-large', '21', '21-large', 'edit', 'refs', 'refs4', 'rgba', 'cancel'];
+const allowed = ['2512', '2512-large', '21', '21-large', 'edit', 'refs', 'refs4', 'rgba', 'cancel'];
 if (!allowed.includes(mode) || !process.argv.includes('--execute')) {
   console.error('用法：node scripts/accept-cloud.mjs <模式> --execute。会在已连接的真实 Worker 执行任务；GPU 模式会使用显卡资源。');
   process.exit(2);
@@ -38,18 +37,11 @@ try {
   const address = process.env.ZHILUME_WORKER_ADDRESS;
   const workers = await call('/workers');
   if (!workers.length) await call('/workers', { address: address, credential: process.env.ZHILUME_WORKER_TOKEN });
-  if (mode === 'cpu') await waitFor(() => call('/capabilities'), list => list.some(c => c.id === 'media.audio.extract.v1' && c.ready));
-  const models = mode === 'cpu' ? [] : await waitFor(() => call('/image-models'), list => list.some(m => m.id === (mode.startsWith('2512') ? 'qwen-image-2512' : 'qwen-image-2.1') && m.ready));
+  const models = await waitFor(() => call('/image-models'), list => list.some(m => m.id === (mode.startsWith('2512') ? 'qwen-image-2512' : 'qwen-image-2.1') && m.ready));
   console.log('Cloud Worker connected; mode:', mode);
   const project = await call('/projects', { name: '上海二A 5090 真实验收 ' + mode });
   let operation, input;
-  if (mode === 'cpu') {
-    execFileSync(process.env.ZHILUME_FFMPEG || 'ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=s=128x72:r=10:d=2', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', '-y', join(root, 'source.mp4')], { windowsHide: true });
-    const bytes = await readFile(join(root, 'source.mp4'));
-    const upload = await fetch(base + '/assets/uploads?filename=cloud-test.mp4', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/octet-stream' }, body: bytes });
-    assert.ok(upload.ok); const asset = await upload.json();
-    operation = 'media.audio.extract.v1'; input = { assetId: asset.id, start: 0.25, end: 1.5 };
-  } else {
+  {
     const model = models.find(m => m.id === (mode.startsWith('2512') ? 'qwen-image-2512' : 'qwen-image-2.1'));
     const p = model.profiles[0];
     const references = [];
@@ -90,7 +82,7 @@ try {
     const response = await fetch(base + '/assets/' + asset.id + '/content', { headers });
     assert.ok(response.ok); const bytes = Buffer.from(await response.arrayBuffer());
     assert.equal(createHash('sha256').update(bytes).digest('hex'), asset.sha256);
-    const path = join(root, 'outputs', mode + (mode === 'cpu' ? '.wav' : '.png'));
+    const path = join(root, 'outputs', mode + '.png');
     await writeFile(path, bytes); record.asset = asset; record.output = path;
   }
   await writeFile(join(root, mode + '-result.json'), JSON.stringify(record, (key, value) => ['url', 'downloadUrl'].includes(key) ? undefined : value, 2));

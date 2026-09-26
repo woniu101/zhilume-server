@@ -1,0 +1,133 @@
+{
+  "date": "2026-09-26T09:02:08.629Z",
+  "versions": {
+    "studio": "0.9.0",
+    "server": "0.7.0",
+    "worker": "0.6.0"
+  },
+  "workers": [],
+  "desktop": [
+    {
+      "filename": "desktop-clip.mp4",
+      "size": 47370,
+      "sha256": "0da324336c393aae921207fc8142789a6b4c572912caa9ea9f80e5e0ced8a0b3",
+      "provenance": {
+        "operation": "media.video.trim.v1",
+        "sourceAssetIds": [
+          "5489699e-13fe-426d-91d6-0f3daa4acd4f"
+        ],
+        "parameters": {
+          "start": 0,
+          "end": 2
+        }
+      },
+      "probe": [
+        "  Duration: 00:00:02.00, start: 0.000000, bitrate: 189 kb/s\r",
+        "  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 180x320 [SAR 1:1 DAR 9:16], 184 kb/s, 12 fps, 12 tbr, 12288 tbn (default)\r",
+        "  Stream #0:0(und): Video: wrapped_avframe, yuv420p(progressive), 180x320 [SAR 1:1 DAR 9:16], q=2-31, 200 kb/s, 12 fps, 12 tbn (default)\r"
+      ]
+    },
+    {
+      "filename": "desktop-audio.wav",
+      "size": 176478,
+      "sha256": "1b6c0fff9ed1afc492a37aeee2dc999e9c3fd471cfab39048c009865f0b158f1",
+      "provenance": {
+        "operation": "media.audio.extract.v1",
+        "sourceAssetIds": [
+          "c8a1557f-80e8-4dc9-9a89-34ee6c63229c"
+        ],
+        "parameters": {
+          "start": 0,
+          "end": 2
+        }
+      },
+      "probe": [
+        "  Duration: 00:00:02.00, bitrate: 705 kb/s\r",
+        "  Stream #0:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 44100 Hz, 1 channels, s16, 705 kb/s\r",
+        "  Stream #0:0: Audio: pcm_s16le, 44100 Hz, mono, s16, 705 kb/s\r"
+      ]
+    }
+  ],
+  "packagedServer": [
+    {
+      "operation": "media.video.trim.v1",
+      "status": "succeeded",
+      "executor": "server",
+      "workerId": null,
+      "filename": "server-clip.mp4",
+      "provenance": {
+        "operation": "media.video.trim.v1",
+        "sourceAssetIds": [
+          "c8a1557f-80e8-4dc9-9a89-34ee6c63229c"
+        ],
+        "parameters": {
+          "start": 0.5,
+          "end": 1.5
+        }
+      },
+      "probe": [
+        "  Duration: 00:00:01.00, start: 0.000000, bitrate: 177 kb/s\r",
+        "  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 160x90 [SAR 1:1 DAR 16:9], 91 kb/s, 10 fps, 10 tbr, 10240 tbn (default)\r",
+        "  Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono, fltp, 69 kb/s (default)\r",
+        "  Stream #0:0(und): Video: wrapped_avframe, yuv420p(progressive), 160x90 [SAR 1:1 DAR 16:9], q=2-31, 200 kb/s, 10 fps, 10 tbn (default)\r",
+        "  Stream #0:1(und): Audio: pcm_s16le, 44100 Hz, mono, s16, 705 kb/s (default)\r"
+      ]
+    },
+    {
+      "operation": "media.audio.extract.v1",
+      "status": "succeeded",
+      "executor": "server",
+      "workerId": null,
+      "filename": "server-audio.wav",
+      "provenance": {
+        "operation": "media.audio.extract.v1",
+        "sourceAssetIds": [
+          "c8a1557f-80e8-4dc9-9a89-34ee6c63229c"
+        ],
+        "parameters": {
+          "start": 0.5,
+          "end": 1.5
+        }
+      },
+      "probe": [
+        "  Duration: 00:00:01.00, bitrate: 706 kb/s\r",
+        "  Stream #0:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 44100 Hz, 1 channels, s16, 705 kb/s\r",
+        "  Stream #0:0: Audio: pcm_s16le, 44100 Hz, mono, s16, 705 kb/s\r"
+      ]
+    }
+  ],
+  "canvasKinds": [
+    "video",
+    "audio",
+    "video",
+    "video"
+  ],
+  "localSourceIndexRegistered": true,
+  "cacheEntries": 1,
+  "desktopImage": {
+    "filename": "desktop-crop.png",
+    "width": 180,
+    "height": 320,
+    "provenance": {
+      "operation": "image.crop.v1",
+      "sourceAssetIds": [
+        "20da3046-0f38-4c07-b48e-04e9e790f111"
+      ],
+      "parameters": {
+        "x": 0,
+        "y": 0,
+        "width": 180,
+        "height": 320,
+        "rows": 2,
+        "columns": 2,
+        "gap": 16,
+        "cell": 512,
+        "background": "#ffffff",
+        "outputIndex": 0
+      }
+    },
+    "cacheFiles": 1,
+    "canvasNodes": 2,
+    "workers": []
+  }
+}

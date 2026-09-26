@@ -1,6 +1,6 @@
 # 协议开发基线（信封 2.0 / 契约快照 2.0.0）
 
-当前实现覆盖 GPU 图片执行协议、CPU 媒体处理及显式模拟闭环；GPU 推理尚未验收。初版直接修改契约，不为历史开发版保留兼容分支。能力目录由 Server 发布、Worker 内含带 SHA-256 的快照。
+当前实现覆盖 GPU 图片执行协议、CPU 媒体处理及显式模拟闭环；上海二 A GPU 样本验收见云端报告。初版直接修改契约，不为历史开发版保留兼容分支。能力目录由 Server 发布、Worker 内含带 SHA-256 的快照。
 
 ## Worker 接入
 
@@ -19,7 +19,7 @@
 - Server PUT Worker `/api/v1/attempts/{attemptId}/inputs/{assetId}` 流式上传，鉴权头加 X-Lease-Id。Worker 校验任务归属、有效租约、大小与哈希后原子改名；完整文件重复上传直接确认。
 - result_ready.payload 为 `{filename,size,sha256}`；Server GET 同一 Worker `/api/v1/attempts/{attemptId}/output`，流式导入并核对声明和能力契约。结果只归档到当前有效尝试。
 - Worker 收到 commit_ack 后清理成功输出；重复 result_ready 在归档后再次得到确认。连接中断期间保留输出；进程重启不自动重复执行，Server 标记中断后允许手动重试。
-- 模拟、CPU 与图片生成仍使用原有操作 ID；CPU 输入 {assetId,start,end}，输出 MP4 H.264/AAC 或 WAV PCM。模拟结果必须标记 simulation。
+- Worker 只执行模拟和 GPU 生成，不发布或接收 media.video.trim.v1 / media.audio.extract.v1；模拟结果标记 simulation。
 - 原 enrollments、workers/register、worker/connect 和 Worker 回调文件接口全部移除，不兼容协议 1.0。
 
 ## 状态与恢复
@@ -96,3 +96,17 @@ hello.imageProfiles 为公开配置数组：modelId、profileId（64 位 SHA-256
 媒体节点 data.generationDraft 保存图片表单：operation、modelId、profileId、prompt、negative、sizeMode、refs（有序素材 ID）、format、width、height、steps、seed；可选 request={fingerprint,id,seed} 保存未确认提交的幂等请求。data.textDraft 保存未应用到正文的文本编辑。草稿允许空提示词等未完成状态，Server 校验类型、长度与范围；真正提交任务时仍执行严格输入校验，草稿不代表可执行任务。复制节点应清除 request。沿用画布 revision 乐观锁与本地草稿恢复机制。
 
 GET /workers 增加派生 state（disabled/offline/draining/busy/ready）、reason、heartbeatAgeSeconds 和 activeJobs（id/status/stage）。心跳年龄超过 40 秒或连接断开时派生为 offline；状态不表示 GPU 模型已通过推理验收。连接密钥不对外返回。
+
+## 普通媒体处理（Studio 0.9 / Server 0.7 / Worker 0.6）
+
+Web POST `/jobs` 参数 `{requestId,projectId,nodeId?,sourceRevision?,operation,input:{assetId,start,end}}`，operation 为 media.video.trim.v1 或 media.audio.extract.v1。返回 `executor=server`、`workerId=null`；GPU/模拟任务为 executor=worker。`/capabilities` 的媒体 ready 只表示 Server 内置 FFmpeg 可用。队列固定单并发，无 Worker lease 或 assigned 阶段。
+
+状态 queued/running/cancel_requested/succeeded/failed/cancelled/interrupted。进度 null 表示校验，0..1 表示编码；归档完成才成功。errorCode 为 invalid_range/no_audio/invalid_media/source_missing/input_limit/output_limit/ffmpeg_unavailable/processing_failed/disk_full/io_error/server_stopped/server_restarted；error 为展示文案。参数错误 HTTP 400，探测错误异步 failed。取消等待进程退出；重试复用 Job ID、新建 attemptId。服务重启不自动重复活动转码，排队任务继续。
+
+Electron IPC：media.create(assetId,operation,{start,end})、run(id)、cancel(id)、retrySync(id)、dispose(id)。窗口隔离所属任务，不接受任意命令、路径或下载 URL。onProgress 事件 `{id,phase,progress:number|null}`；phase 为 validating/downloading/processing/syncing/succeeded/failed/sync_failed/cancelled。run 返回 `{ok:true,asset,sourceKind:local|cache|download}` 或 `{ok:false,error:{code,message},canRetrySync}`。
+
+导入真实 File 后 preload 通过 webUtils 取得路径，按 Server+assetId 登记；读取前比对大小/SHA-256。本地不存在或已变更时从鉴权素材接口流式下载，校验完整性后入缓存并显示字节进度，拒绝重定向。输出 POST `/assets/uploads?filename=...` 带 X-Asset-Provenance 和 X-Media-Sync-Id（任务 UUID）；重复完成的同步返回原 Asset，同步冲突返回 409 sync_busy。同步失败重试不再编码。桌面任务不占 Server 转码队列。
+
+共享源码仅在 packages/media；`npm run media:sync -- ../zhilume-studio` 生成相同 tgz，分别 npm install 刷新锁文件。后续改动递增包版本。两端完整解包 ffmpeg-static 目录与许可证，Web dist 无 WASM。初版 Windows x64 发布，其他平台依赖按目标平台安装构建，不混用 Windows 二进制。
+
+Electron 图片工具使用 createSource(assetId) / readImage(id) 读取上限 64 MiB 的原图字节；复用相同本地路径校验、远程缓存、下载进度与取消机制。图像像素处理留在 renderer Canvas，不调用 FFmpeg。读取会话由 dispose(id) 释放。

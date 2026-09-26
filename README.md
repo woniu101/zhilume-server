@@ -1,6 +1,6 @@
 # Zhilume Server
 
-独立服务、Web 管理台与 Windows 启动器。当前 0.6.0 初版，配套 Studio 0.8.0 / Worker 0.5.0。支持图片任务调度、CPU 媒体处理和模拟能力。上海二 A 5090 的真实 Qwen 2512 / 2.1 图片执行与 Server 主动连接链路已完成样本验收，见 [云端报告](docs/cloud-acceptance-2026-09-26.md)。
+独立服务、Web 管理台与 Windows 启动器。当前 0.7.0 初版，配套 Studio 0.9.0 / Worker 0.6.0。支持图片任务调度、CPU 媒体处理和模拟能力。上海二 A 5090 的真实 Qwen 2512 / 2.1 图片执行与 Server 主动连接链路已完成样本验收，见 [云端报告](docs/cloud-acceptance-2026-09-26.md)。
 
 - `/api/v1/image-models` 返回 Qwen 2512 / 2.1 目录及在线执行配置；未显式启用图片 Worker 时不能提交 GPU 任务。
 - 调度按模型、配置指纹、工作流版本和操作匹配，保留多图顺序与结果 provenance。
@@ -51,6 +51,12 @@ npm run pack
 
 `npm run desktop` 使用安装后的 Electron 直接运行开发构建。如果安装依赖时关闭了生命周期脚本，先执行 `node node_modules/electron/install.js`。打包使用这个已安装的 Electron 目录，避免重复下载解压。
 
+## 基础媒体处理
+
+Web 的视频截取和抽音轨由 Server 内置 FFmpeg 执行，队列固定并发 1，没有在线 Worker 也可使用。Electron Studio 在自己的主进程本地处理，两端共享 `@zhilume/media`；图片工具使用 Studio Canvas。详见 [媒体架构验收](docs/media-acceptance-2026-09-26.md)。
+
+共享模块源码位于 `packages/media`。修改后递增包版本，运行 `npm run media:sync -- ../zhilume-studio`，再分别安装依赖、刷新锁文件并重建发布包。不要在 Studio 单独维护 FFmpeg 参数。
+
 ## Worker 与协议
 
 在管理台“接入执行端”填写 Worker 地址和接入密钥，可先测试连接。Server 主动连接 Worker，并上传输入、下载结果；Server 无需公网地址。连接地址必须从 Server 所在机器可达。网络配置由用户自行解决，本项目不内置 SSH 隧道、组网、中继或外部工具入口。
@@ -71,11 +77,11 @@ npm test
 
 集成测试包含真实 Python Worker 子进程，默认要求相邻 `zhilume-worker` 已执行 `uv sync`。`ZHILUME_TEST_PYTHON` 可指定其他已安装 Worker 包的 Python。测试使用临时数据库和随机端口，不调用 GPU 或付费服务。
 
-Linux 服务使用同一源码和 Node 22.13+：`npm ci && npm run build && npm start`。可由 systemd 等进程管理器运行，数据目录必须可写。远程入口应由反向代理提供 HTTPS，并显式配置来源。已在本机 WSL Ubuntu 22.04 完成 Linux 构建和 Server—Worker 集成验收；容器、公网与云平台部署尚未验收。
+Linux 服务使用同一源码和 Node 22.13+：`npm ci && npm run build && npm start`。可由 systemd 等进程管理器运行，数据目录必须可写。远程入口应由反向代理提供 HTTPS，并显式配置来源。此前在本机 WSL Ubuntu 22.04 完成的 Linux 构建和 Server—Worker 集成验收不包含本次媒体重构；本版 Linux 媒体队列与发布包仍待验收。
 
 本版不是完整首期验收，见 [开发记录](docs/development-status.md) 和 [PRD 快照](docs/prd.md)。
 
-Linux 可重复验收（同级准备三端仓库，Node 22.13+、uv 和 FFmpeg 可用）：
+Linux 可重复验收（同级准备三端仓库，Node 22.13+、uv 可用，FFmpeg 随依赖安装）：
 
 ```bash
 bash scripts/accept-linux.sh

@@ -7,7 +7,6 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 command -v node >/dev/null
 command -v npm >/dev/null
 command -v uv >/dev/null
-command -v "${ZHILUME_FFMPEG:-ffmpeg}" >/dev/null || { echo 'CPU 媒体验收需要 FFmpeg'; exit 1; }
 [[ -f ../zhilume-worker/uv.lock && -d ../zhilume-studio/src/contracts ]] || { echo '请在同级准备 Studio 和 Worker 仓库'; exit 1; }
 # No user Server, cloud credentials, ComfyUI process or GPU weights are used.
 # Tests create isolated temporary servers and use fake ComfyUI responses.
