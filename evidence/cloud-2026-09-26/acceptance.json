@@ -1,0 +1,301 @@
+{
+  "date": "2026-09-26",
+  "region": "cn-sh2-01",
+  "gpu": "RTX 5090 32GB",
+  "cpu": 14,
+  "ramGiB": 48,
+  "comfyCommit": "79be670e2d9be63e238785af307369d2b9039ed1",
+  "metricsNote": "2 second samples, resident model caches included; not minimum memory requirement",
+  "results": [
+    {
+      "case": "cpu",
+      "status": "succeeded",
+      "seconds": 6.44,
+      "operation": "media.audio.extract.v1",
+      "parameters": {
+        "start": 0.25,
+        "end": 1.5
+      },
+      "jobId": "746061a3-6176-4405-9542-aef3a8c6cfc7",
+      "attemptId": "2c97dfab-6ff5-4839-8fc8-297f1378651e",
+      "startedAt": "2026-09-26T08:26:01.774Z",
+      "finishedAt": "2026-09-26T08:26:07.043Z",
+      "observedGpuMiB": null,
+      "referenceCount": 0,
+      "sha256": "fb74013a1f07517dc6cc9f1fb495f7c5e0640cb7ea721635c571c9db75cccfbd"
+    },
+    {
+      "case": "2512",
+      "status": "succeeded",
+      "seconds": 41.578,
+      "operation": "image.generate.v1",
+      "parameters": {
+        "modelId": "qwen-image-2512",
+        "profileId": "1acfab86bd6ae79e6d65eeed5855b8138f0532d71245391f76c3a1e281a41f0c",
+        "workflowRevision": "qwen2512-v1",
+        "prompt": "A small mint green toy robot on a light wooden table, soft window light, clean product photography, centered full view, plain warm gray background.",
+        "negativePrompt": "",
+        "steps": 30,
+        "seed": 20260926,
+        "outputFormat": "png",
+        "width": 512,
+        "height": 512
+      },
+      "jobId": "adb7f8e8-aba6-4984-8b17-3ceb134f68ea",
+      "attemptId": "fae072f3-a825-4c58-8c8a-fc1e4ee4c8c1",
+      "startedAt": "2026-09-26T08:21:11.779Z",
+      "finishedAt": "2026-09-26T08:21:52.406Z",
+      "observedGpuMiB": 28016,
+      "referenceCount": 0,
+      "sha256": "746461701483f68273a121f62e24c2c342e9f32a08f92c889e4f06c1815f06bd",
+      "imageSize": [
+        512,
+        512
+      ],
+      "imageMode": "RGB"
+    },
+    {
+      "case": "2512-large",
+      "status": "succeeded",
+      "seconds": 47.804,
+      "operation": "image.generate.v1",
+      "parameters": {
+        "modelId": "qwen-image-2512",
+        "profileId": "1acfab86bd6ae79e6d65eeed5855b8138f0532d71245391f76c3a1e281a41f0c",
+        "workflowRevision": "qwen2512-v1",
+        "prompt": "A small mint green toy robot on a light wooden table, soft window light, clean product photography, centered full view, plain warm gray background.",
+        "negativePrompt": "",
+        "steps": 50,
+        "seed": 20260926,
+        "outputFormat": "png",
+        "width": 1024,
+        "height": 1024
+      },
+      "jobId": "9ef300fd-7149-41dc-a488-181532d3071d",
+      "attemptId": "6470d290-5ec3-4add-9038-6dee0ad2d7dc",
+      "startedAt": "2026-09-26T08:22:15.558Z",
+      "finishedAt": "2026-09-26T08:23:01.200Z",
+      "observedGpuMiB": 28344,
+      "referenceCount": 0,
+      "sha256": "a97b7fcb014701d4900f6fd9d04c67f6f451cbb99eb9067e698fdb1b10010c1f",
+      "imageSize": [
+        1024,
+        1024
+      ],
+      "imageMode": "RGB"
+    },
+    {
+      "case": "21",
+      "status": "succeeded",
+      "seconds": 23.51,
+      "operation": "image.generate.v1",
+      "parameters": {
+        "modelId": "qwen-image-2.1",
+        "profileId": "9618f5ef4a36ed09c73ee52a6f6a0674f6255019816b43a5304ad3acee739f70",
+        "workflowRevision": "qwen21-v1",
+        "prompt": "A blue ceramic teapot on a light wooden table, soft window light, clean product photography, centered full view, plain warm gray background.",
+        "negativePrompt": "",
+        "steps": 25,
+        "seed": 20260926,
+        "outputFormat": "png",
+        "width": 512,
+        "height": 512
+      },
+      "jobId": "44a4a71a-5fec-4558-950b-a68a870a5aff",
+      "attemptId": "84c94bec-8b26-4531-accf-cfeb7ecbc5d1",
+      "startedAt": "2026-09-26T08:15:17.426Z",
+      "finishedAt": "2026-09-26T08:15:39.424Z",
+      "observedGpuMiB": 15118,
+      "referenceCount": 0,
+      "sha256": "7e5514dc5993c836b9ded60dc468e7a1cf3120b0b0f0a0beda8a2e01c52bb2ac",
+      "imageSize": [
+        512,
+        512
+      ],
+      "imageMode": "RGB"
+    },
+    {
+      "case": "edit",
+      "status": "succeeded",
+      "seconds": 14.443,
+      "operation": "image.edit.v1",
+      "parameters": {
+        "modelId": "qwen-image-2.1",
+        "profileId": "9618f5ef4a36ed09c73ee52a6f6a0674f6255019816b43a5304ad3acee739f70",
+        "workflowRevision": "qwen21-v1",
+        "prompt": "Change the blue ceramic teapot to bright red. Keep the teapot shape, wooden table, composition and lighting unchanged.",
+        "negativePrompt": "",
+        "steps": 25,
+        "seed": 20260926,
+        "outputFormat": "png",
+        "referenceResolution": 1024
+      },
+      "jobId": "b85cbe55-00d0-4407-b503-1150870af0bc",
+      "attemptId": "12a32376-a6b7-47cd-9f0d-17536da7efb3",
+      "startedAt": "2026-09-26T08:16:07.959Z",
+      "finishedAt": "2026-09-26T08:16:20.222Z",
+      "observedGpuMiB": 19848,
+      "referenceCount": 1,
+      "sha256": "a022ef3a054de93b125de4cc0fa11a439150a74a8ae4aa7b61ea9a2345d5caff",
+      "imageSize": [
+        1024,
+        1024
+      ],
+      "imageMode": "RGB"
+    },
+    {
+      "case": "refs",
+      "status": "succeeded",
+      "seconds": 14.482,
+      "operation": "image.reference.v1",
+      "parameters": {
+        "modelId": "qwen-image-2.1",
+        "profileId": "9618f5ef4a36ed09c73ee52a6f6a0674f6255019816b43a5304ad3acee739f70",
+        "workflowRevision": "qwen21-v1",
+        "prompt": "Place the blue ceramic teapot from image 1 beside the small mint green toy robot from image 2 on the same light wooden table. Both objects fully visible, natural daylight, clean product photograph.",
+        "negativePrompt": "",
+        "steps": 25,
+        "seed": 20260926,
+        "outputFormat": "png",
+        "referenceResolution": 1024
+      },
+      "jobId": "8eae801e-ba14-46a8-b0c7-eaafaa64e71d",
+      "attemptId": "a5e40fea-5e8c-444f-b834-866ffa2457d0",
+      "startedAt": "2026-09-26T08:16:41.630Z",
+      "finishedAt": "2026-09-26T08:16:54.235Z",
+      "observedGpuMiB": 22568,
+      "referenceCount": 2,
+      "sha256": "d0387b39b9af70a1a1a4aa28f50bb28db7f36999266b7192ab2238638444c8ac",
+      "imageSize": [
+        1024,
+        1024
+      ],
+      "imageMode": "RGB"
+    },
+    {
+      "case": "refs4",
+      "status": "succeeded",
+      "seconds": 47.584,
+      "operation": "image.reference.v1",
+      "parameters": {
+        "modelId": "qwen-image-2.1",
+        "profileId": "9618f5ef4a36ed09c73ee52a6f6a0674f6255019816b43a5304ad3acee739f70",
+        "workflowRevision": "qwen21-v1",
+        "prompt": "Create a product display on a wooden table using all four references: the blue teapot from image 1 on the left, the mint green robot from image 2 in the center, the red teapot from image 3 on the right, and the blue teapot from image 4 in the foreground. Four separate objects, all fully visible.",
+        "negativePrompt": "",
+        "steps": 25,
+        "seed": 20260926,
+        "outputFormat": "png",
+        "referenceResolution": 1024
+      },
+      "jobId": "cde6cb86-86ff-410c-84c0-2b3b08060cae",
+      "attemptId": "f5e2585f-a786-4357-9dea-317da81bca63",
+      "startedAt": "2026-09-26T08:23:41.803Z",
+      "finishedAt": "2026-09-26T08:24:27.548Z",
+      "observedGpuMiB": 27864,
+      "referenceCount": 4,
+      "sha256": "b4dbbf1311fa7a3f39a687d11be198437928becc854384e360600a7a33cc58fe",
+      "imageSize": [
+        1024,
+        1024
+      ],
+      "imageMode": "RGB"
+    },
+    {
+      "case": "rgba",
+      "status": "succeeded",
+      "seconds": 6.323,
+      "operation": "image.generate.v1",
+      "parameters": {
+        "modelId": "qwen-image-2.1",
+        "profileId": "9618f5ef4a36ed09c73ee52a6f6a0674f6255019816b43a5304ad3acee739f70",
+        "workflowRevision": "qwen21-v1",
+        "prompt": "A single blue ceramic teapot, isolated on a transparent background, clean product cutout, no table, no shadow, full object.",
+        "negativePrompt": "",
+        "steps": 25,
+        "seed": 20260926,
+        "outputFormat": "rgba",
+        "width": 512,
+        "height": 512
+      },
+      "jobId": "420a4674-48c4-4b82-94b1-ab5e18249dd1",
+      "attemptId": "58982516-f37b-4e78-a21f-16d59877a446",
+      "startedAt": "2026-09-26T08:17:39.558Z",
+      "finishedAt": "2026-09-26T08:17:44.298Z",
+      "observedGpuMiB": 16816,
+      "referenceCount": 0,
+      "sha256": "39c47106a4d6a70f22989b2a3036cf25fe28581c9d484c03a99038e3f0bf29a7",
+      "imageSize": [
+        512,
+        512
+      ],
+      "imageMode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ]
+    },
+    {
+      "case": "21-large",
+      "status": "succeeded",
+      "seconds": 17.464,
+      "operation": "image.generate.v1",
+      "parameters": {
+        "modelId": "qwen-image-2.1",
+        "profileId": "9618f5ef4a36ed09c73ee52a6f6a0674f6255019816b43a5304ad3acee739f70",
+        "workflowRevision": "qwen21-v1",
+        "prompt": "A blue ceramic teapot on a light wooden table, soft window light, clean product photography, centered full view, plain warm gray background.",
+        "negativePrompt": "",
+        "steps": 25,
+        "seed": 20260926,
+        "outputFormat": "png",
+        "width": 1536,
+        "height": 1536
+      },
+      "jobId": "f19d23cb-0039-41ab-ab6c-40933deb3059",
+      "attemptId": "89acd4ea-03fe-48ea-9dba-3d7e2a491377",
+      "startedAt": "2026-09-26T08:24:47.352Z",
+      "finishedAt": "2026-09-26T08:25:01.165Z",
+      "observedGpuMiB": 17816,
+      "referenceCount": 0,
+      "sha256": "31b293faa35390c98e5b760b51c63d5c31474cf5f932523b7c0334de1fef6b5c",
+      "imageSize": [
+        1536,
+        1536
+      ],
+      "imageMode": "RGB"
+    },
+    {
+      "case": "cancel",
+      "status": "cancelled",
+      "seconds": 6.316,
+      "operation": "image.generate.v1",
+      "parameters": {
+        "modelId": "qwen-image-2.1",
+        "profileId": "9618f5ef4a36ed09c73ee52a6f6a0674f6255019816b43a5304ad3acee739f70",
+        "workflowRevision": "qwen21-v1",
+        "prompt": "A blue ceramic teapot on a light wooden table, soft window light, clean product photography, centered full view, plain warm gray background.",
+        "negativePrompt": "",
+        "steps": 100,
+        "seed": 20260926,
+        "outputFormat": "png",
+        "width": 1536,
+        "height": 1536
+      },
+      "jobId": "9fd22fe2-de76-4a8f-b120-96fd749e02bc",
+      "attemptId": "15776641-20d5-48a9-9072-6c491db13cb2",
+      "startedAt": "2026-09-26T08:18:48.436Z",
+      "finishedAt": "2026-09-26T08:18:54.346Z",
+      "observedGpuMiB": 17864,
+      "referenceCount": 0
+    }
+  ],
+  "reconnect": {
+    "status": "succeeded",
+    "jobId": "676e8494-3a2a-49cb-8001-b50d6beb44e0",
+    "attemptId": "c02233f2-b842-401b-bd8f-e52448b84aae",
+    "serverHadNoListeningPort": true,
+    "disconnectSeconds": 12,
+    "unauthenticatedStatus": 401
+  }
+}

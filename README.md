@@ -1,6 +1,6 @@
 # Zhilume Server
 
-独立服务、Web 管理台与 Windows 启动器。当前 0.6.0 初版，配套 Studio 0.8.0 / Worker 0.5.0。支持图片任务调度、CPU 媒体处理和模拟能力；真实 Qwen GPU 推理尚未验收。
+独立服务、Web 管理台与 Windows 启动器。当前 0.6.0 初版，配套 Studio 0.8.0 / Worker 0.5.0。支持图片任务调度、CPU 媒体处理和模拟能力。上海二 A 5090 的真实 Qwen 2512 / 2.1 图片执行与 Server 主动连接链路已完成样本验收，见 [云端报告](docs/cloud-acceptance-2026-09-26.md)。
 
 - `/api/v1/image-models` 返回 Qwen 2512 / 2.1 目录及在线执行配置；未显式启用图片 Worker 时不能提交 GPU 任务。
 - 调度按模型、配置指纹、工作流版本和操作匹配，保留多图顺序与结果 provenance。
