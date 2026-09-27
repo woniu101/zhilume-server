@@ -218,3 +218,7 @@ React/TS/React Flow + Tiptap Studio、Fastify/SQLite Server、主动 WS 的 Pyth
 - M4 远程 Linux Worker/云平台模拟验收未开始；M5 真实生成继续暂缓，无 GPU/计费资源调用。
 
 全部未完需求继续保留在 PRD，本轮增量不代表 A01–A25 全部交付。
+
+## 2026-09-27：IndexTTS 上海二 A 实测
+
+Worker 0.7.1 已通过中文真实 GPU 合成、语速、四种情绪模式、取消后继续接单，云端 Linux 18/18 测试通过。精确模型清单补齐文字情绪聊天模板，预检增加缺文件回归；模型权重全部软链接，无下载。Server 不监听入站端口仍完成归档。实例已关机，未发布镜像。详情及尚未覆盖项见 [语音验收](speech-acceptance-2026-09-27.md)。Studio 0.11.0 和 Server 0.8.0 界面与发布包未变。
