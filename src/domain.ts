@@ -1,3 +1,4 @@
+import { validateVideoDraft } from './video-operations.js';
 import { validateSpeechDraft } from './speech-operations.js';
 import { validateGenerationDraft } from "./generation-draft.js";
 import { randomUUID } from "node:crypto";
@@ -84,6 +85,7 @@ export function validateCanvas(doc: any) {
         (typeof node.data.text !== "string" || node.data.text.length > 12000))
     )
       throw new AppError("invalid_node_content", "节点标题或文本超过允许长度");
+    if (node.data.videoDraft !== undefined) validateVideoDraft(node.data.videoDraft);
     if (node.data.speechDraft !== undefined) validateSpeechDraft(node.data.speechDraft);
     if (node.data.generationDraft !== undefined) validateGenerationDraft(node.data.generationDraft);
     if (node.data.textDraft !== undefined && (typeof node.data.textDraft !== "string" || node.data.textDraft.length > 12000))

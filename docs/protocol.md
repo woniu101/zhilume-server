@@ -128,3 +128,14 @@ POST `/jobs` operation=audio.speech.v1，input 为 `{modelId,profileId,workflowR
 data.speechDraft 保存未完成语音表单与可选 request={id,fingerprint}；允许空音频 ID、空文本、不完整片段，长文本草稿上限 100000 字，实际提交上限来自 profile 且最多 1000。界面保留超限输入供调整，禁止静默截断。复制节点清除 request；失败重提相同参数复用请求 ID。Server 重试重新校验在线配置和资产。
 
 任务状态沿用 queued/assigned/running/cancel_requested/succeeded/failed/cancelled/interrupted，executor=worker。进度阶段为准备音色与情绪参考、加载 IndexTTS 并合成语音、校验语音结果，progress=null；结果经校验与归档才成功。Worker 取消/超时先结束所持有子进程再回报；推理失败为 failed，详细原因保留在本地 attempts/<attemptId>/speech.log。来源素材和规范化参数归档至 provenance。普通视频截取/抽音轨仍走 Studio/Server CPU 模块。
+
+
+## 视频生成（目录 1.6.0，wire protocol 2.0）
+
+GET `/video-models` 返回 FL2VA、Ref2VA 模型目录及在线 profiles。hello.videoProfiles 为 `{modelId,profileId,workflowRevision,modes,sizes:[[w,h]],frames:[124,...],fps:24,referenceLimits:{image,video,audio},defaultSteps,maxSteps:50,validation:unverified}`。只有显式启用且加载器模型/必需节点检查通过才声明 video.generate.v1；该检查不证明推理成功。
+
+POST `/jobs` operation=video.generate.v1，input 为 `{modelId,profileId,workflowRevision,mode,prompt,width,height,frames,steps,seed,includeAudio,references:[{role,assetId,start?,frames?}]}`。mode=text/first/last/first-last/reference；前四种仅接受相应首尾帧图片角色，reference 接受 image/video/audio。时序参考 start 为起始秒数，frames 为 24 FPS 下指定片段长度；至少 56 帧并满足 17k+5，且不超过输出长度。Server 规范化角色字段、补齐 fps=24、outputFormat=mp4 和有序去重 referenceAssetIds；派发附 referenceAssets，使用现有输入文件传输接口。
+
+输出尺寸来自 profile，帧数 124–345、17k+5；参考数量不超过 profile 与总数 12，视频/音频各累计不超过 15 秒。图片上限 64 MiB，其余 256 MiB；不允许 staged 素材。草稿 data.videoDraft 保留首尾帧 ID、参考列表、参数、模式及可选 request={id,fingerprint}，允许空内容、离线 profile、最多 1000 个待调整引用；真正提交严格限制 12。复制节点清除 request。
+
+任务状态复用 queued/assigned/running/cancel_requested/succeeded/failed/cancelled/interrupted，executor=worker。阶段为准备 H3 参考片段、传输参考素材到 ComfyUI、模型执行中、校验视频与音轨，progress=null。取消等待 FFmpeg 退出或 ComfyUI 对应 prompt 停止；无法确认时 failed 并撤下同端点图片/视频能力。输出必须为 H.264 MP4、准确尺寸/帧数/24 FPS，includeAudio=true 时含 32kHz 立体声；归档前校验文件与 SHA-256，成功才回 commit_ack。provenance 保留去重 sourceAssetIds 与完整规范化参数。

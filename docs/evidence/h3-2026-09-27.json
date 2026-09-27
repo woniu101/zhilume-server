@@ -1,0 +1,173 @@
+{
+  "date": "2026-09-27",
+  "region": "Shanghai 2A",
+  "gpu": "RTX 5090 32 GiB",
+  "comfyRevision": "79be670e2d9be63e238785af307369d2b9039ed1",
+  "workerVersion": "0.8.0",
+  "workflowValidation": [
+    {
+      "mode": "text",
+      "valid": true,
+      "error": null,
+      "nodeErrors": {}
+    },
+    {
+      "mode": "first",
+      "valid": true,
+      "error": null,
+      "nodeErrors": {}
+    },
+    {
+      "mode": "last",
+      "valid": true,
+      "error": null,
+      "nodeErrors": {}
+    },
+    {
+      "mode": "first-last",
+      "valid": true,
+      "error": null,
+      "nodeErrors": {}
+    },
+    {
+      "mode": "reference",
+      "valid": true,
+      "error": null,
+      "nodeErrors": {}
+    }
+  ],
+  "gpuSamples": [
+    {
+      "mode": "text",
+      "status": "succeeded",
+      "elapsedSeconds": 38.571,
+      "serverListened": false,
+      "profileId": "2a37bb03995868d830af3df744da7149f87edae333dc3c7e2031e31affbb18fa",
+      "workflowRevision": "h3-fl2va-v1",
+      "sha256": "3e8ab5fe03fcd85271ff0bc15d0bfa81c99e7399118d936e63dd19084927fdf9",
+      "bytes": 147001,
+      "streams": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 512,
+          "height": 288,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124"
+        },
+        {
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "sample_rate": "32000",
+          "channels": 2,
+          "r_frame_rate": "0/0",
+          "nb_frames": "163"
+        }
+      ]
+    },
+    {
+      "mode": "first-last",
+      "status": "succeeded",
+      "elapsedSeconds": 24.334,
+      "serverListened": false,
+      "profileId": "2a37bb03995868d830af3df744da7149f87edae333dc3c7e2031e31affbb18fa",
+      "workflowRevision": "h3-fl2va-v1",
+      "sha256": "7d1f894c9955b1e022ae1da1f6b9f71fdfc1b45e1a74d84d6b6e30c6dbff2df3",
+      "bytes": 88871,
+      "streams": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 512,
+          "height": 288,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124"
+        }
+      ]
+    },
+    {
+      "mode": "reference",
+      "status": "succeeded",
+      "elapsedSeconds": 78.678,
+      "serverListened": false,
+      "profileId": "aa23dec2ae999ecc86a308208a3a38401e2b5107e5e0f8f2490cf9c957c52cb9",
+      "workflowRevision": "h3-ref2va-v1",
+      "sha256": "e9ae0c245a707155fcc4b040ed4b3bd884a712aa23a69e67a6eb4f9836eb0a33",
+      "bytes": 140390,
+      "streams": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 512,
+          "height": 288,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124"
+        },
+        {
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "sample_rate": "32000",
+          "channels": 2,
+          "r_frame_rate": "0/0",
+          "nb_frames": "163"
+        }
+      ]
+    },
+    {
+      "mode": "cancel",
+      "status": "cancelled",
+      "elapsedSeconds": 12.233,
+      "serverListened": false,
+      "profileId": "2a37bb03995868d830af3df744da7149f87edae333dc3c7e2031e31affbb18fa",
+      "workflowRevision": "h3-fl2va-v1"
+    },
+    {
+      "mode": "after-cancel",
+      "status": "succeeded",
+      "elapsedSeconds": 21.169,
+      "serverListened": false,
+      "profileId": "2a37bb03995868d830af3df744da7149f87edae333dc3c7e2031e31affbb18fa",
+      "workflowRevision": "h3-fl2va-v1",
+      "sha256": "6802a570c17e8b899967ed7acae815d31ddedfafee0d4d8a41d0fe7347c9039f",
+      "bytes": 169672,
+      "streams": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 512,
+          "height": 288,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124"
+        },
+        {
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "sample_rate": "32000",
+          "channels": 2,
+          "r_frame_rate": "0/0",
+          "nb_frames": "163"
+        }
+      ]
+    }
+  ],
+  "linuxTests": {
+    "passed": 20,
+    "skipped": 0
+  },
+  "shortReference": "2.111-second audio rejected before GPU for requested 56 frames (2.333 seconds)",
+  "finalComfyQueue": {
+    "running": 0,
+    "pending": 0
+  },
+  "instanceStopped": true,
+  "notValidated": [
+    "subjective quality",
+    "higher resolution",
+    "long videos",
+    "maximum references",
+    "other regions",
+    "new image cold boot",
+    "mixed speech/image/video GPU switching",
+    "OOM and driver crash recovery"
+  ]
+}
