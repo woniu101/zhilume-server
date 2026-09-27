@@ -2,7 +2,7 @@
  * Source: https://github.com/MiniMax-AI/MiniMax-H3/tree/main/skills/h3-prompt-writing
  * Reviewed 2026-09-27. This revision is frozen in submitted jobs.
  */
-export const promptRulesRevision = 'zhilume-prompts-2026-09-27.1';
+export const promptRulesRevision = 'zhilume-prompts-2026-09-27.3';
 export function h3Rules(context: any) {
   const reference = context?.mode === 'reference';
   return [

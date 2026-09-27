@@ -146,3 +146,7 @@ POST `/jobs` operation=video.generate.v1，input 为 `{modelId,profileId,workflo
 ## Worker 本机管理 API
 
 FastAPI 同端口提供 `/management` 静态页面及 `/management/api/*`。所有管理 API 单独校验管理 Bearer，任务接入凭证无权访问。GET overview/access/diagnostics/operations；PUT executors/:kind/config；POST executors/:kind/check|enable|disable（停用 policy=wait|cancel）；POST access（configure/unbind/rotate）；POST install（先计划，execute=true 才安装）。长操作返回 operationId，通过 operations 查询。任务 API 仍要求调度凭证及绑定/lease，管理凭证不能替代任务凭证。具体部署及共用 CLI 见 Worker deploy/management.md。
+
+## 语言模型规格
+
+执行规格种类新增 `language`，与图片/语音/视频共用 GPU 调度和任务文件传输；互联网模型仍走独立 API 队列。输入冻结规则与输出 TXT 校验见 [语言执行协议](language-execution.md)。

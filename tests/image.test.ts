@@ -50,7 +50,8 @@ test('real Python worker against local fake Comfy: text generation, ordered mult
       const raw = Buffer.concat(chunks), path = new URL(req.url!, 'http://local').pathname;
       const body = req.headers['content-type']?.includes('application/json') ? JSON.parse(raw.toString()) : undefined;
       let result: any;
-      if (path === '/object_info') result = info;
+      if (path === '/system_stats') result = { devices: [] };
+      else if (path === '/object_info') result = info;
       else if (path === '/queue') result = { queue_pending: [], queue_running: active ? [[0, active]] : [] };
       else if (path === '/upload/image') { uploads.push(raw); result = { name: `reference-${uploads.length}.png`, subfolder: '' }; }
       else if (path === '/prompt') { graphs.push(body); active = body.prompt_id; result = { prompt_id: active }; }

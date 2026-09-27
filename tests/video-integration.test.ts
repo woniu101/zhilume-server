@@ -29,7 +29,8 @@ test('H3 transport: explicit references, MP4 archive, cancellation and recovery 
     const chunks=[];for await(const c of req)chunks.push(c);
     const raw=Buffer.concat(chunks),path=new URL(req.url!,'http://local').pathname;
     const body=req.headers['content-type']?.includes('application/json')?JSON.parse(raw.toString()):null;let result:any={};
-    if(path==='/object_info')result=info;
+    if(path==='/system_stats')result={devices:[]};
+    else if(path==='/object_info')result=info;
     else if(path==='/queue')result={queue_running:active?[[0,active]]:[],queue_pending:[]};
     else if(path==='/upload/image')result={name:'reference.png',subfolder:''};
     else if(path==='/prompt'){graphs.push(body);active=body.prompt_id;result={prompt_id:active};}

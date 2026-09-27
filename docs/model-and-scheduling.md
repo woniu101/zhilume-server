@@ -1,6 +1,6 @@
 # 模型接入与任务调度基线
 
-适用版本：Studio 0.13、Server 0.10、Worker 0.9。协议信封 3.0、契约快照 3.0.0、能力目录 1.7.0。初版直接重构，不提供旧开发版兼容。
+适用版本：Studio 0.14、Server 0.11、Worker 0.12。协议信封 3.0、契约快照 3.0.0、能力目录 1.7.0。初版直接重构，不提供旧开发版兼容。
 
 ## 职责与执行位置
 
@@ -25,7 +25,7 @@ Qwen 内部文本编码器和 IndexTTS 文字情绪模型不是通用语言模�
 
 本机 Python、ComfyUI URL、模型文件名/目录、工作目录和设备配置保留在 Worker 管理配置内，不加入规格摘要。不同路径但相同执行规格可跨 Worker 等价匹配。声明的权重身份由部署者核对，环境检查不等于重新计算全部大型权重的哈希。
 
-Worker hello 的 `executionSpecs` 为 `{kind: image|speech|video, spec}` 列表；`deployment` 为 `{capacity:1, resourceIds:[GPU_UUID...]}`。Server 校验各类规格与摘要后持久登记。已登记规格离线后仍可选择并排队；从未登记的规格不可猜测参数提交。
+Worker hello 的 `executionSpecs` 为 `{kind: image|speech|video|language, spec}` 列表；`deployment` 为 `{capacity:1, resourceIds:[GPU_UUID...]}`。Server 校验各类规格与摘要后持久登记。已登记规格离线后仍可选择并排队；从未登记的规格不可猜测参数提交。
 
 Studio 按模型及规格聚合，展示版本、量化、就绪执行端数量，默认自动选择匹配空闲 Worker。高级选项可固定 Worker；指定执行端离线会等待，不静默切换。执行端数量是 Worker 数量，不是独立 GPU 数量；共享 GPU 仍受资源互斥约束。
 
@@ -114,3 +114,7 @@ ComfyUI 服务由部署者管理进程、Python、GPU 和模型目录。Qwen/H3 
 - 管理操作记录与磁盘安装清单不同：磁盘清单包含 installing/installed-unchecked/incomplete/cancelled。服务重启不会自动续装，骤停遗留 installing 不算成功。目录内分别保存依赖锁、实际依赖清单及阶段；所有失败重试使用新目录。
 
 验证范围与阻塞项见 [标准安装阶段验收](worker-standard-install-acceptance-2026-09-27.md)。
+
+## 语言模型双路径
+
+独立语言模型可在互联网 API 或 GPU Worker 执行；由选定规格决定队列。新增结构化协议、思考模式、输出上限与 llama.cpp 部署边界，详见 [语言执行协议](language-execution.md)。

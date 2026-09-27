@@ -1,3 +1,5 @@
+import { workerLanguageModels, validateWorkerLanguage, validateLanguageProfiles } from './worker-language.js';
+import { validateLanguageOutput } from './language-request.js';
 import { LanguageService, languageOperations } from './language.js';
 import { fingerprint as taskFingerprint, validateDeployment, route, validateGraph, bindInput } from './execution.js';
 import { videoCapabilities, isVideoOperation, videoAvailability, validateVideoInput, validateVideoProfiles, supportsVideoJob } from './video-operations.js';
@@ -454,7 +456,7 @@ export async function createApp(options: Options) {
   });
   app.get("/api/v1/capabilities", async (req) => {
     owner(req);
-    return [...languageOperations.map(id => ({id, name: id === "text.generate.v1" ? "文本生成" : "提示词优化", executor: "api", ready: language.models().some(m => m.ready)})), ...executableCapabilities.map((c) => ({
+    return [...languageOperations.map(id => ({id, name: id === "text.generate.v1" ? "文本生成" : "提示词优化", executor: "api", ready: [...language.models(), ...workerLanguageModels(knownWorkers())].some(m => m.ready)})), ...executableCapabilities.map((c) => ({
       ...c,
       executor: c.id.startsWith('media.') ? 'server' : 'worker',
       ready: c.id.startsWith('media.') ? mediaQueue.ready : store
@@ -486,11 +488,11 @@ export async function createApp(options: Options) {
     return publicJob(requireValue(store.get("job", req.params.id)));
   });
   function knownWorkers() {
-    return [...store.all("worker"), { id: 'registry', name: '已登记规格', connected: false, imageProfiles: store.all('execution-spec').filter(s => s.kind === 'image').map(s => s.spec), speechProfiles: store.all('execution-spec').filter(s => s.kind === 'speech').map(s => s.spec), videoProfiles: store.all('execution-spec').filter(s => s.kind === 'video').map(s => s.spec) }];
+    return [...store.all("worker"), { id: 'registry', name: '已登记规格', connected: false, imageProfiles: store.all('execution-spec').filter(s => s.kind === 'image').map(s => s.spec), speechProfiles: store.all('execution-spec').filter(s => s.kind === 'speech').map(s => s.spec), languageProfiles: store.all('execution-spec').filter(s => s.kind === 'language').map(s => s.spec), videoProfiles: store.all('execution-spec').filter(s => s.kind === 'video').map(s => s.spec) }];
   }
   function normalize(operation: string, input: any, lookup = (assetId: string) => store.get('asset', assetId)): any {
     if (!executableOperations.includes(operation)) throw new AppError('unknown_capability', '不支持此执行能力');
-    return languageOperations.includes(operation) ? language.validate(operation, input, lookup)
+    return languageOperations.includes(operation) ? (store.get('language-spec', input?.profileId) ? language.validate(operation, input, lookup) : validateWorkerLanguage(operation, input, knownWorkers(), lookup))
       : isVideoOperation(operation) ? validateVideoInput(input, knownWorkers(), lookup)
       : isSpeechOperation(operation) ? validateSpeechInput(input, knownWorkers(), lookup)
       : isImageOperation(operation) ? validateImageInput(operation, input, knownWorkers(), lookup)
@@ -503,8 +505,8 @@ export async function createApp(options: Options) {
     if (b.nodeId && !store.get('canvas', project.id)?.nodes.some((n: any) => n.id === b.nodeId)) throw new AppError('node_missing', '请先保存画布节点');
     if (b.nodeId && b.operation !== 'prompt.optimize.v1' && store.all('job').some(j => j.nodeId === b.nodeId && j.projectId === project.id && j.operation !== 'prompt.optimize.v1' && !terminal.has(j.status))) throw new AppError('node_busy', '此节点已有未结束任务', 409);
     const targetWorkerId = b.targetWorkerId ? text(b.targetWorkerId, 100) : null;
-    if (targetWorkerId && (!store.get('worker', targetWorkerId) || languageOperations.includes(b.operation) || b.operation.startsWith('media.'))) throw new AppError('invalid_target', '此任务不能指定该执行端');
-    const executor = languageOperations.includes(b.operation) ? 'api' : b.operation.startsWith('media.') ? 'server' : 'worker';
+    const executor = languageOperations.includes(b.operation) && store.get('language-spec', input.profileId) ? 'api' : b.operation.startsWith('media.') ? 'server' : 'worker';
+    if (targetWorkerId && (!store.get('worker', targetWorkerId) || executor !== 'worker')) throw new AppError('invalid_target', '此任务不能指定该执行端');
     if (executor === 'server' && !mediaQueue.ready) throw new AppError('ffmpeg_unavailable', 'Server 内置 FFmpeg 不可用', 503);
     const assetIds = [...new Set([...(input.referenceAssetIds || []), ...(input.assetId ? [input.assetId] : [])])];
     return { id: id(), requestId: text(b.requestId, 100), fingerprint: taskFingerprint(b), projectId: project.id, nodeId: b.nodeId || null,
@@ -514,8 +516,8 @@ export async function createApp(options: Options) {
   }
   app.get('/api/v1/language/providers', async req => { owner(req); return language.providers(); });
   app.post('/api/v1/language/providers', async (req: any) => { owner(req); return language.configure(req.body); });
-  app.get('/api/v1/language/models', async req => { owner(req); return language.models(); });
-  app.get('/api/v1/models', async req => { owner(req); return { image: modelAvailability(knownWorkers()), speech: speechAvailability(knownWorkers()), video: videoAvailability(knownWorkers()), language: language.models() }; });
+  app.get('/api/v1/language/models', async req => { owner(req); return [...language.models(), ...workerLanguageModels(knownWorkers())]; });
+  app.get('/api/v1/models', async req => { owner(req); return { image: modelAvailability(knownWorkers()), speech: speechAvailability(knownWorkers()), video: videoAvailability(knownWorkers()), language: [...language.models(), ...workerLanguageModels(knownWorkers())] }; });
   app.post('/api/v1/jobs', async (req: any, reply) => {
     owner(req); const b = req.body; text(b.requestId, 100);
     const previous = store.all('job').find(j => j.requestId === b.requestId);
@@ -784,6 +786,7 @@ export async function createApp(options: Options) {
               requireValue(store.get("asset", job.input.assetId)),
             ),
           }
+        : languageOperations.includes(job.operation) ? { ...job.input, referenceAssets: [] }
         : (isImageOperation(job.operation) || isSpeechOperation(job.operation) || isVideoOperation(job.operation))
           ? { ...job.input, referenceAssets: job.input.referenceAssetIds.map((id: string) => publicAsset(requireValue(store.get("asset", id)))) }
           : job.input;
@@ -827,20 +830,21 @@ export async function createApp(options: Options) {
             throw new AppError("invalid_capabilities", "能力声明无效");
           const deployment = validateDeployment(msg.payload.deployment);
           const specs = msg.payload.executionSpecs;
-          if (!Array.isArray(specs) || specs.length > 40 || specs.some((s: any) => !['image', 'speech', 'video'].includes(s.kind))) throw new AppError('invalid_specs', '执行规格声明无效');
+          if (!Array.isArray(specs) || specs.length > 40 || specs.some((s: any) => !['image', 'speech', 'video', 'language'].includes(s.kind))) throw new AppError('invalid_specs', '执行规格声明无效');
+          const languageProfiles = validateLanguageProfiles(specs.filter((s: any) => s.kind === 'language').map((s: any) => s.spec));
           const imageProfiles = validateImageProfiles(specs.filter((s: any) => s.kind === 'image').map((s: any) => s.spec));
           const speechProfiles = validateSpeechProfiles(specs.filter((s: any) => s.kind === 'speech').map((s: any) => s.spec));
           const videoProfiles = validateVideoProfiles(specs.filter((s: any) => s.kind === 'video').map((s: any) => s.spec));
-          for (const [kind, profiles] of [['image', imageProfiles], ['speech', speechProfiles], ['video', videoProfiles]] as const)
+          for (const [kind, profiles] of [['image', imageProfiles], ['speech', speechProfiles], ['video', videoProfiles], ['language', languageProfiles]] as const)
             for (const spec of profiles) store.put('execution-spec', { id: spec.profileId, kind, spec });
           welcomed = true;
           clearTimeout(handshakeTimeout);
           Object.assign(w, {
             connected: true,
             lastHeartbeat: Date.now(),
-            imageProfiles, speechProfiles, videoProfiles, deployment, activeAttempts: msg.payload.activeAttempts,
+            imageProfiles, speechProfiles, videoProfiles, languageProfiles, deployment, activeAttempts: msg.payload.activeAttempts,
             capabilities: msg.payload.capabilities.filter((s: string) =>
-              !s.startsWith('media.') && executableOperations.includes(s) && (!isImageOperation(s) || imageProfiles.some(p => p.operations.includes(s))) && (!isSpeechOperation(s) || speechProfiles.length > 0) && (!isVideoOperation(s) || videoProfiles.length > 0),
+              (!languageOperations.includes(s) || languageProfiles.some(p => p.operations.includes(s))) && !s.startsWith('media.') && executableOperations.includes(s) && (!isImageOperation(s) || imageProfiles.some(p => p.operations.includes(s))) && (!isSpeechOperation(s) || speechProfiles.length > 0) && (!isVideoOperation(s) || videoProfiles.length > 0),
             ),
           });
           store.put("worker", w);
@@ -977,12 +981,14 @@ export async function createApp(options: Options) {
             (isVideoOperation(j.operation) && (a.kind !== "video" || !a.filename.toLowerCase().endsWith(".mp4"))) ||
             (isSpeechOperation(j.operation) && (a.kind !== "audio" || !a.filename.toLowerCase().endsWith(".wav"))) ||
             (isImageOperation(j.operation) && (a.kind !== "image" || !a.filename.toLowerCase().endsWith(".png"))) ||
-            (j.operation === operations[0] && a.kind !== "text") ||
+            ((j.operation === operations[0] || languageOperations.includes(j.operation)) && a.kind !== "text") ||
             (j.operation === operations[1] &&
               (a.kind !== store.get("asset", j.input.assetId)!.kind ||
                 a.sha256 !== store.get("asset", j.input.assetId)!.sha256))
           )
             throw new AppError("invalid_output", "执行结果不符合能力契约");
+          const outputText = languageOperations.includes(j.operation) ? (a.size > 48000 ? (() => { throw new AppError('output_too_large', '文本结果过大'); })() : validateLanguageOutput(await readFile(assets.path(a), 'utf8'), j.input.schema)) : undefined;
+          assertLive(j);
           store.atomic(() => {
             store.put("asset", { ...a, staged: false });
             Object.assign(j, {
@@ -990,6 +996,7 @@ export async function createApp(options: Options) {
               stage: "已归档",
               progress: 1,
               outputAssetId: a.id,
+              ...(outputText !== undefined ? { outputText } : {}),
             });
             store.put("job", j);
           });

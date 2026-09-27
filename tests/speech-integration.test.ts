@@ -42,7 +42,7 @@ class IndexTTS2:
   };
   async function wait(get: () => Promise<any>, ready: (v: any) => boolean) {
     for (let i = 0; i < 200; i++) { const value = await get(); if (ready(value)) return value; await new Promise(r => setTimeout(r, 100)); }
-    throw new Error('timeout: ' + peer?.log());
+    throw new Error('timeout: ' + peer?.log() + await peer?.diagnostics());
   }
   peer = await startWorker(join(root, 'worker'), ['--speech-config', configPath, '--enable-speech-execution'], undefined, false, resolve('../zhilume-worker/tests/speech_worker.py'));
   await call('/workers', { address: peer.address, credential: peer.credential });

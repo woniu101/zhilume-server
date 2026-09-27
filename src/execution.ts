@@ -1,3 +1,4 @@
+import { supportsLanguageJob } from './worker-language.js';
 import { createHash } from 'node:crypto';
 import { AppError, terminal } from './domain.js';
 import { online, supportsImageJob } from './image-operations.js';
@@ -38,7 +39,7 @@ export function availableProfiles(workers: any[], key: string, modelId: string) 
 }
 export function route(job: any, workers: any[], jobs: any[], connected: (id: string) => boolean) {
   const matching = workers.filter(w => (!job.targetWorkerId || job.targetWorkerId === w.id) && w.capabilities.includes(job.operation) &&
-    supportsImageJob(w, job) && supportsSpeechJob(w, job) && supportsVideoJob(w, job));
+    supportsImageJob(w, job) && supportsSpeechJob(w, job) && supportsVideoJob(w, job) && supportsLanguageJob(w, job));
   const ready = matching.filter(w => online(w) && connected(w.id));
   const busy = jobs.filter(j => j.executor === 'worker' && ['assigned', 'running', 'cancel_requested'].includes(j.status));
   const releasing = workers.filter(w => online(w) && w.activeAttempts?.length);

@@ -1,20 +1,15 @@
-import { h3Rules, promptRulesRevision } from './prompt-rules.js';
+import { languageOperations, validateLanguageInput, validateLanguageOutput } from './language-request.js';
+export { languageOperations } from './language-request.js';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
-import { Ajv } from 'ajv';
 import { AppError, id, text, terminal } from './domain.js';
 import { fingerprint } from './execution.js';
 import type { Store } from './store.js';
 import type { Assets } from './assets.js';
 
-export const languageOperations = ['text.generate.v1', 'prompt.optimize.v1'];
-const rules: Record<string, string> = {
-  general: 'Improve clarity and specificity while preserving the author intent and language. Do not invent requirements. Return only the proposed prompt.',
-  qwen: 'Write a precise image generation or instruction-editing prompt. Separate what changes from what must remain. Preserve named subjects, reference order, exact quoted text, composition and aspect constraints. Do not invent references. Return only the proposed prompt.',
-};
 export class LanguageService {
   private key: Buffer;
   private secrets: Record<string, string>;
@@ -55,7 +50,9 @@ export class LanguageService {
       if (!capabilities.includes('text') || capabilities.some(c => !['text', 'vision', 'structured'].includes(c as string)))
         throw new AppError('invalid_capabilities', '语言模型须声明文本能力，可选图片理解和结构化输出');
       const model = { model: text(m.model, 160), name: text(m.name || m.model, 160), revision: text(m.revision || m.model, 160), capabilities,
+        structuredMode: m.structuredMode || 'json_schema', reasoningEffort: m.reasoningEffort || 'default', maxOutputTokens: Number(m.maxOutputTokens || 2048),
         maxInputCharacters: Number(m.maxInputCharacters || 12000), maxImages: Number(m.maxImages ?? 4) };
+      if (!['json_schema', 'json_object'].includes(model.structuredMode) || !['default', 'none', 'low', 'high'].includes(model.reasoningEffort) || !Number.isInteger(model.maxOutputTokens) || model.maxOutputTokens < 16 || model.maxOutputTokens > 8192) throw new AppError('invalid_options', '结构化协议、思考模式或输出上限无效');
       if (!Number.isInteger(model.maxInputCharacters) || model.maxInputCharacters < 1 || model.maxInputCharacters > 20000 || !Number.isInteger(model.maxImages) || model.maxImages < 0 || model.maxImages > 8)
         throw new AppError('invalid_limits', '输入长度或图片数量无效');
       return { ...model, profileId: fingerprint({ providerId, protocol: 'chat-completions', baseUrl: url.href.replace(/\/$/, ''), ...model }) };
@@ -78,27 +75,13 @@ export class LanguageService {
     });
     return this.providers().find(p => p.id === providerId);
   }
-  models() { return this.providers().flatMap(p => p.models.map((m: any) => ({ ...m, providerId: p.id, providerName: p.name, ready: p.enabled && p.hasKey, defaults: Object.keys(p.defaults).filter(k => p.defaults[k] === m.model) }))); }
+  models() { return this.providers().flatMap(p => p.models.map((m: any) => ({ ...m, providerId: p.id, providerName: p.name, executor: 'api', ready: p.enabled && p.hasKey, defaults: Object.keys(p.defaults).filter(k => p.defaults[k] === m.model) }))); }
   validate(operation: string, b: any, lookup = (assetId: string) => this.store.get('asset', assetId)) {
     const spec = this.store.get('language-spec', b?.profileId);
     if (!spec || !languageOperations.includes(operation)) throw new AppError('invalid_model', '请选择已配置的语言模型');
-    const content = text(b.text, spec.maxInputCharacters);
-    const references = b.referenceAssetIds || [];
-    if (!Array.isArray(references) || references.length > spec.maxImages || new Set(references).size !== references.length || (references.length && !spec.capabilities.includes('vision'))) throw new AppError('unsupported_vision', '此规格不支持这些图片输入');
-    for (const aId of references) { const a = lookup(aId); if (!a || a.staged || a.kind !== 'image' || a.size > 8 * 1024 ** 2) throw new AppError('invalid_reference', '图片须已归档且不超过 8 MB'); }
-    if (b.schema) {
-      if (!spec.capabilities.includes('structured') || JSON.stringify(b.schema).length > 16000) throw new AppError('unsupported_structure', '此规格不支持结构化输出');
-      try { new Ajv({ strict: false }).compile(b.schema); } catch { throw new AppError('invalid_schema', 'JSON Schema 无效'); }
-    }
-    const purpose = operation === 'prompt.optimize.v1' ? b.purpose || 'general' : 'text';
-    if (operation === 'prompt.optimize.v1' && !['general', 'qwen', 'h3'].includes(purpose)) throw new AppError('invalid_purpose', '提示词规则不存在');
-    let context = null;
-    if (purpose === 'h3' && b.context) {
-      if (!['text','first','last','first-last','reference'].includes(b.context.mode) || !Number.isFinite(b.context.duration) || b.context.duration < 0 || b.context.duration > 15 || typeof b.context.includeAudio !== 'boolean') throw new AppError('invalid_context', 'H3 提示词约束无效');
-      context = { mode: b.context.mode, duration: b.context.duration, includeAudio: b.context.includeAudio };
-    }
-    return { profileId: spec.id, modelId: spec.model, text: content, referenceAssetIds: references, schema: b.schema || null, purpose, context, rulesRevision: promptRulesRevision };
+    return validateLanguageInput(operation, b, spec, lookup);
   }
+
   cancel(jobId: string) { this.active.get(jobId)?.abort.abort(); }
   pump() {
     if (this.closing) return;
@@ -125,19 +108,18 @@ export class LanguageService {
       const response = await fetch(spec.baseUrl + '/chat/completions', {
         method: 'POST', redirect: 'error', signal: abort.signal,
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + this.secrets[spec.providerId] },
-        body: JSON.stringify({ model: spec.model, stream: false, messages: [
-          { role: 'system', content: input.purpose === 'text' ? 'Follow the user request. Return the requested text only.' : input.purpose === 'h3' ? h3Rules(input.context) : rules[input.purpose] },
+        body: JSON.stringify({ model: spec.model, stream: false, max_tokens: spec.maxOutputTokens, ...(spec.reasoningEffort !== 'default' ? { reasoning_effort: spec.reasoningEffort } : {}), messages: [
+          { role: 'system', content: input.systemPrompt },
           { role: 'user', content: parts.length === 1 ? input.text : parts },
-        ], ...(input.schema ? { response_format: { type: 'json_schema', json_schema: { name: 'result', strict: true, schema: input.schema } } } : {}) }),
+        ], ...(input.schema ? { response_format: spec.structuredMode === 'json_object' ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: 'result', strict: true, schema: input.schema } } } : {}) }),
       });
       if (!response.ok) throw new AppError('provider_error', `语言模型服务返回 HTTP ${response.status}`);
       // Bound provider output before parsing; never persist raw error responses or headers.
       let raw = ''; const decoder = new TextDecoder();
       for await (const chunk of response.body as any) { raw += decoder.decode(chunk, { stream: true }); if (raw.length > 256000) { abort.abort(); throw new AppError('output_too_large', '语言模型响应过大'); } }
       raw += decoder.decode(); const result = JSON.parse(raw);
-      const content = text(result.choices?.[0]?.message?.content, 12000);
+      const content = validateLanguageOutput(result.choices?.[0]?.message?.content, input.schema);
       if (result.choices?.[0]?.finish_reason !== 'stop') throw new AppError('incomplete_output', '语言模型未完整输出，请调整输入后重试');
-      if (input.schema && !new Ajv({ strict: false }).compile(input.schema)(JSON.parse(content))) throw new AppError('invalid_output', '输出不符合 JSON Schema');
       const asset = await this.assets.ingest(Readable.from([Buffer.from(content)]), '语言模型结果.txt', { staged: true, jobId: job.id, attemptId: job.attemptId });
       const current = this.store.get('job', job.id);
       if (abort.signal.aborted || current.status === 'cancel_requested') throw new Error('cancelled');

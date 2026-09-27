@@ -17,7 +17,12 @@ export async function startWorker(state: string, args: string[] = [], port?: num
     try {
       const identity = JSON.parse(await readFile(join(state, 'identity.json'), 'utf8'));
       const response = await fetch(address + '/api/v1/system', { headers: { Authorization: 'Bearer ' + identity.credential }, signal: AbortSignal.timeout(500) });
-      if (response.ok) return { child, address, credential: identity.credential, workerId: identity.workerId, port: port!, log: () => log };
+      if (response.ok) {
+        const management = (await readFile(join(state, 'credentials/management-token'), 'utf8')).trim();
+        const overview = await (await fetch(address + '/management/api/overview', { headers: { Authorization: 'Bearer ' + management } })).json() as any;
+        for (const e of overview.executors || []) if (e.state === 'error') log += '\nExecutor ' + e.id + ': ' + e.reason;
+        return { child, address, credential: identity.credential, workerId: identity.workerId, port: port!, log: () => log, diagnostics: async () => { const v=await (await fetch(address+'/management/api/overview',{headers:{Authorization:'Bearer '+management}})).json() as any; return JSON.stringify(v.executors?.map((e:any)=>({id:e.id,state:e.state,reason:e.reason,checks:e.checks}))); } };
+      }
     } catch {}
     await new Promise(r => setTimeout(r, 100));
   }
