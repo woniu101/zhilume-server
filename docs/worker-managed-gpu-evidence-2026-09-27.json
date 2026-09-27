@@ -1,0 +1,157 @@
+{
+  "date": "2026-09-27",
+  "region": "Shanghai 2A",
+  "gpu": "RTX 5090 32 GB",
+  "workerVersion": "0.10.0",
+  "startedAt": "2026-09-27T08:54:58.855Z",
+  "finishedAt": "2026-09-27T08:59:10.923Z",
+  "serverListening": false,
+  "wheelSha256": "e98dc8ad79b834fd9ea360ca618b3d9e9fce5636f9fecb6773cba0580bcbaae4",
+  "comfyRevision": "79be670e2d9be63e238785af307369d2b9039ed1",
+  "indexTtsRevision": "ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c",
+  "corePython": "Python 3.12.3",
+  "profiles": {
+    "image": "5c81e3c63d1ef27dcd220eaf09bdf002bd14e45a3f7370408c36dd723bb63a07",
+    "video": "e223d7601453cf0d32779ba91409a3aa06254a4f7da74e9e267174784d15491b",
+    "speech": "b5d136f7398edaa17d76afcce32877087c43d2461592d68247c3b66e0be15b2f"
+  },
+  "existingImageAndSpeechProfilesUnchanged": true,
+  "results": [
+    {
+      "operation": "image.generate.v1",
+      "status": "succeeded",
+      "asset": {
+        "id": "a039ca55-1b03-4460-aa98-a1ada13f8ded",
+        "size": 315283,
+        "sha256": "a9d86975963f6202aa1d69fb714f09fda541b64c61769c394939472fd7919490",
+        "kind": "image"
+      },
+      "releasedGpuMiB": [
+        780
+      ]
+    },
+    {
+      "operation": "audio.speech.v1",
+      "status": "succeeded",
+      "asset": {
+        "id": "d0656b4f-9b53-4833-96c3-f04111b45c79",
+        "size": 147200,
+        "sha256": "07935dcdf1b72e120e2af175fbbfba836e82688bce3728fe61850cab812975bd",
+        "kind": "audio"
+      },
+      "releasedGpuMiB": [
+        780
+      ]
+    },
+    {
+      "operation": "video.generate.v1",
+      "status": "succeeded",
+      "asset": {
+        "id": "2fcb2953-1727-45c6-9c57-e1cc18a4ce6f",
+        "size": 147001,
+        "sha256": "2033159963ae25f92d3a0f8ac278dc307f369d375fbd30ce8e72b82e5a748135",
+        "kind": "video"
+      },
+      "releasedGpuMiB": [
+        828
+      ]
+    },
+    {
+      "operation": "video.generate.v1",
+      "status": "cancelled",
+      "asset": null,
+      "releasedGpuMiB": [
+        2
+      ]
+    },
+    {
+      "operation": "image.generate.v1",
+      "status": "succeeded",
+      "asset": {
+        "id": "54ed2395-97aa-44e5-9239-6f8979b56427",
+        "size": 303061,
+        "sha256": "0b50a2367bc0aa320323f02144f240f051f997150e4057e049b55eb16a4fa5fa",
+        "kind": "image"
+      },
+      "releasedGpuMiB": [
+        780
+      ]
+    }
+  ],
+  "operations": [
+    {
+      "path": "runtimes/comfy-main/check",
+      "state": "succeeded",
+      "elapsedMs": 264
+    },
+    {
+      "path": "runtimes/comfy-main/start",
+      "state": "succeeded",
+      "elapsedMs": 11768
+    },
+    {
+      "path": "executors/image/enable",
+      "state": "succeeded",
+      "elapsedMs": 3547
+    },
+    {
+      "path": "executors/video/enable",
+      "state": "succeeded",
+      "elapsedMs": 3543
+    },
+    {
+      "path": "executors/speech/enable",
+      "state": "succeeded",
+      "elapsedMs": 2097
+    },
+    {
+      "path": "runtimes/comfy-main/stop",
+      "state": "succeeded",
+      "elapsedMs": 7220
+    },
+    {
+      "path": "runtimes/comfy-main/start",
+      "state": "succeeded",
+      "elapsedMs": 25028
+    },
+    {
+      "path": "executors/image/enable",
+      "state": "succeeded",
+      "elapsedMs": 3576
+    },
+    {
+      "path": "runtimes/comfy-main/stop",
+      "state": "succeeded",
+      "elapsedMs": 1993
+    }
+  ],
+  "management": {
+    "activeSamples": 50,
+    "p95Ms": 614,
+    "maxMs": 788,
+    "probeFailures": 0
+  },
+  "restart": {
+    "identityPreserved": true,
+    "oldManagedPidsGone": true,
+    "restartDoesNotAutostartRuntime": true,
+    "explicitRecoveryPassed": true,
+    "serverConnected": false,
+    "version": "0.10.0"
+  },
+  "gpuMiBAfterRestart": [
+    2
+  ],
+  "cloudFinalState": "Stopped",
+  "modelDownloads": false,
+  "gpuDependenciesReinstalled": false,
+  "notTested": [
+    "fresh inference environment installation",
+    "other platforms and regions",
+    "container GPU",
+    "multi-GPU",
+    "hard crash recovery",
+    "wait for running task before stopping",
+    "H3 first-last/ref2va in this run"
+  ]
+}
