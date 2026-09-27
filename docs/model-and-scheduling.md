@@ -104,3 +104,13 @@ ComfyUI 服务由部署者管理进程、Python、GPU 和模型目录。Qwen/H3 
 部署管理 API（仅 management-token）：PUT /management/api/runtimes/{id} 保存服务配置；POST /management/api/runtimes/{id}/{check|start|stop} 返回异步 operationId。stop body 的 policy 为 wait 或 cancel，作用于全部关联执行器。overview/diagnostics 包含 runtimes 与配置故障原因。执行器配置 runtimeId 为空时复用原外部 URL；不为空时由托管配置解析本机 URL，不接受 Studio 或任务载荷指定程序路径。
 
 核心安装与回退、服务进程管理均不提交推理任务。GPU 隔离不会因服务进程退出而清除；原服务恢复启动后仍须执行器 release 检查确认，再发布模型能力。具体部署与未验收项见 Worker deploy/portable.md 及 worker-portable-acceptance-2026-09-27.md。
+
+## Worker 标准安装接口（0.11）
+
+- `POST /management/api/install`：默认只生成计划，输入 kind/directory/python，返回 planId、profile、Python/平台要求、最低磁盘、固定修订、lockSha256、步骤和验证状态。带 `execute: true` 时须提交相同 planId，否则 409；有效请求返回 operationId。
+- 安装不进入 GPU 生成队列，不产生生成积分，不向 Server 发布新模型能力；成功后仍需用户配置并启用。普通媒体任务位置不变。
+- `operations[]` 安装期间增加 stage；终态为 succeeded/failed/cancelled。安装结果 state 为 installed-unchecked，`inferenceVerified: false`。`POST /management/api/operations/{id}/cancel` 只取消安装操作，设置 cancelRequested，清理结束前仍保持 running；重复取消幂等。
+- 上述接口均逐请求验证管理凭证，Server 接入凭证返回 401。目录不得与 Worker state 嵌套；计划、安装、前置检查均使用同一内部实现。安装失败不会启用执行器或修改其现有配置。
+- 管理操作记录与磁盘安装清单不同：磁盘清单包含 installing/installed-unchecked/incomplete/cancelled。服务重启不会自动续装，骤停遗留 installing 不算成功。目录内分别保存依赖锁、实际依赖清单及阶段；所有失败重试使用新目录。
+
+验证范围与阻塞项见 [标准安装阶段验收](worker-standard-install-acceptance-2026-09-27.md)。
