@@ -1,0 +1,112 @@
+{
+  "date": "2026-09-27",
+  "newInstance": true,
+  "imageName": "cuda132_python312",
+  "actualBase": {
+    "os": "Ubuntu 22.04.5",
+    "glibc": "2.35",
+    "defaultPython": "3.10.12",
+    "initialMissingTools": [
+      "git",
+      "uv",
+      "ffmpeg"
+    ]
+  },
+  "preparedTools": {
+    "uv": "0.12.19",
+    "python": [
+      "3.12.14",
+      "3.11.16"
+    ]
+  },
+  "installation": {
+    "host": "Linux-6.12.101-compshare-x86_64-with-glibc2.35",
+    "newBaseImage": true,
+    "environments": {
+      "comfy": {
+        "state": "installed-unchecked",
+        "python": "Python 3.12.14"
+      },
+      "speech": {
+        "state": "installed-unchecked",
+        "python": "Python 3.11.16"
+      }
+    },
+    "gpuInference": false
+  },
+  "coreRelease": {
+    "gpuInference": false,
+    "modelsDownloaded": false,
+    "tests": [
+      "clean-wheel-install-and-upgrade",
+      "core-without-torch-pillow-node",
+      "unbound-management-static-page-and-live-upgrade-guard",
+      "rollback-and-identity-preservation"
+    ]
+  },
+  "linuxControlTests": {
+    "passed": 16,
+    "failed": 0
+  },
+  "executors": {
+    "comfy": {
+      "state": "installed-unchecked",
+      "revision": "79be670e2d9be63e238785af307369d2b9039ed1",
+      "lockSha256": "eb714245884141436d3b7bb15e90069e17b2052ed13019919318673c380ec530",
+      "profile": "comfy-cu128-py312",
+      "inventorySha256": "4c7a868a904a346bace6618c2a5c339944bb89f3f3a7beebe940cdc2c014dbbd"
+    },
+    "speech": {
+      "state": "installed-unchecked",
+      "revision": "ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c",
+      "lockSha256": "2bcec9c6bd4d20d733bdc0537a2f52b39fd67a2e88ad2308836f56fd72da1283",
+      "profile": "indextts-upstream-cu128-py311",
+      "inventorySha256": "04c1dee23dbe85f569d7fd8f5cac58fd3bb8609af8148125424701bc9d93fa30"
+    }
+  },
+  "studioRealGpu": {
+    "startedAt": "2026-09-27T13:19:06.570Z",
+    "gpuInference": true,
+    "fixtureResponses": false,
+    "pageErrors": [],
+    "passed": true,
+    "jobStates": [
+      "running",
+      "succeeded"
+    ],
+    "resultArchived": true,
+    "canvasSaved": true,
+    "imageRendered": true,
+    "asset": {
+      "size": 318214,
+      "sha256": "81a5e6515a113872e38f1bd590c8baab4ed4da6807f6c61fb8f58810ce19567a"
+    },
+    "gpus": [
+      {
+        "uuid": "GPU-452b58a2-f18f-4467-03d9-7fa025bf710f",
+        "name": "NVIDIA GeForce RTX 5090",
+        "totalMiB": "32607",
+        "usedMiB": "746"
+      }
+    ],
+    "finishedAt": "2026-09-27T13:20:07.609Z"
+  },
+  "reopenedCanvas": {
+    "reopenedPersistedCanvas": true,
+    "imageRendered": true,
+    "inViewport": true,
+    "gpuTasksSubmitted": 0
+  },
+  "shutdown": {
+    "state": "Stopped",
+    "scheduleRemoved": true,
+    "dataPreserved": true
+  },
+  "finalIdleVramMiB": 2,
+  "modelWeightsDownloaded": false,
+  "limits": [
+    "Fresh host GPU only tests Qwen 2512; IndexTTS and H3 GPU tests used the earlier fresh isolated environments.",
+    "First browser attempt timed out locating project before GPU submission; retained separately.",
+    "Image generation is a five-step smoke test, not a quality benchmark."
+  ]
+}

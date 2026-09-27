@@ -1,0 +1,314 @@
+{
+  "date": "2026-09-27",
+  "workerVersion": "0.11.0",
+  "serverVersion": "0.10.0",
+  "host": "Shanghai 2A, RTX 5090 32GB, existing container with fresh isolated inference environments",
+  "freshOsImage": false,
+  "serverListening": false,
+  "firstRun": {
+    "startedAt": "2026-09-27T12:47:25.184Z",
+    "finishedAt": "2026-09-27T12:53:27.934Z",
+    "overallPassed": false,
+    "reason": "Management probe failed during acceptance",
+    "management": {
+      "samples": 104,
+      "errors": 1,
+      "activeSamples": 82,
+      "maxMs": 1376,
+      "p95Ms": 405
+    },
+    "results": [
+      {
+        "operation": "image.generate.v1",
+        "status": "succeeded",
+        "jobId": "0db4d462-008a-42c6-98e7-2bd9f48e8541",
+        "profileId": "5c81e3c63d1ef27dcd220eaf09bdf002bd14e45a3f7370408c36dd723bb63a07",
+        "output": {
+          "id": "2f198500-423f-4ff0-b7d2-db3e9c7db002",
+          "size": 318214,
+          "sha256": "81a5e6515a113872e38f1bd590c8baab4ed4da6807f6c61fb8f58810ce19567a",
+          "kind": "image"
+        },
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "746"
+          }
+        ]
+      },
+      {
+        "operation": "image.generate.v1",
+        "status": "succeeded",
+        "jobId": "6d420433-8f94-430f-9381-010d73c766ed",
+        "profileId": "0b54217c3677acd4e2b4829d8652fb0786a28efbc20c03748560d16e9d55b2b2",
+        "output": {
+          "id": "106107e9-7b43-4ffe-a419-d0edf7333bff",
+          "size": 292464,
+          "sha256": "9244138d46944366087b4cd553f3fe12f54c791bbea87537f7f1de2b2e0ff10b",
+          "kind": "image"
+        },
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "748"
+          }
+        ]
+      },
+      {
+        "operation": "image.edit.v1",
+        "status": "succeeded",
+        "jobId": "55afa513-e38a-4f5e-82a4-c4c3f5cb6524",
+        "profileId": "0b54217c3677acd4e2b4829d8652fb0786a28efbc20c03748560d16e9d55b2b2",
+        "output": {
+          "id": "99bcaf17-aa0c-4c90-a24a-f71dc480199e",
+          "size": 1008828,
+          "sha256": "0c49b5034493757963c389918b3429e05385911a1585aea904f265f7b18897bf",
+          "kind": "image"
+        },
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "748"
+          }
+        ]
+      },
+      {
+        "operation": "image.reference.v1",
+        "status": "succeeded",
+        "jobId": "068a3d77-54d9-4997-87a0-1a4c6fca9361",
+        "profileId": "0b54217c3677acd4e2b4829d8652fb0786a28efbc20c03748560d16e9d55b2b2",
+        "output": {
+          "id": "8246d172-f232-46e5-8b87-feb19f7fd6be",
+          "size": 1050367,
+          "sha256": "7809d01426bd2dcdc80540c2bea88216b351ce42a7c31d379b5e755ba88da8ef",
+          "kind": "image"
+        },
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "748"
+          }
+        ]
+      },
+      {
+        "operation": "audio.speech.v1",
+        "status": "succeeded",
+        "jobId": "91afafc0-3cda-4988-a2b2-bc520d5baf9e",
+        "profileId": "b5d136f7398edaa17d76afcce32877087c43d2461592d68247c3b66e0be15b2f",
+        "output": {
+          "id": "fce480cc-cbf5-4852-af54-abfb76de3b49",
+          "size": 145528,
+          "sha256": "0bba4619a5de1eb340a558e4ffc959f29ca6ed0f2650c1603c197d08fc744bfe",
+          "kind": "audio"
+        },
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "748"
+          }
+        ]
+      },
+      {
+        "operation": "video.generate.v1",
+        "status": "succeeded",
+        "jobId": "3e576e2f-3d8d-4f1c-bbc1-2e8f38d91237",
+        "profileId": "e223d7601453cf0d32779ba91409a3aa06254a4f7da74e9e267174784d15491b",
+        "output": {
+          "id": "ddcc3e8b-8d9e-4260-a0fe-b5d958baa5d3",
+          "size": 144412,
+          "sha256": "b2d95004f35d85545e80eb7d3ff446f67f601b3509b95684d1fb469edebb56d5",
+          "kind": "video"
+        },
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "752"
+          }
+        ]
+      },
+      {
+        "operation": "video.generate.v1",
+        "status": "cancelled",
+        "jobId": "18a6fb77-33a3-4e11-8616-b4142af22be1",
+        "profileId": "e223d7601453cf0d32779ba91409a3aa06254a4f7da74e9e267174784d15491b",
+        "output": null,
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "2"
+          }
+        ]
+      },
+      {
+        "operation": "image.generate.v1",
+        "status": "succeeded",
+        "jobId": "d719c355-662d-4c26-95b8-717d8ca8a989",
+        "profileId": "5c81e3c63d1ef27dcd220eaf09bdf002bd14e45a3f7370408c36dd723bb63a07",
+        "output": {
+          "id": "20e97856-a934-4df9-a249-ddbbd73099a0",
+          "size": 305555,
+          "sha256": "3e7ed277a4467ad668bace8ccfd6558ee2304ed9b040305279632ebfb0208542",
+          "kind": "image"
+        },
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "746"
+          }
+        ]
+      }
+    ],
+    "operations": [
+      {
+        "path": "runtimes/comfy-main/check",
+        "state": "succeeded",
+        "elapsedMs": 278
+      },
+      {
+        "path": "runtimes/comfy-main/start",
+        "state": "succeeded",
+        "elapsedMs": 15141
+      },
+      {
+        "path": "executors/image/enable",
+        "state": "succeeded",
+        "elapsedMs": 1929
+      },
+      {
+        "path": "executors/video/enable",
+        "state": "succeeded",
+        "elapsedMs": 1924
+      },
+      {
+        "path": "executors/speech/enable",
+        "state": "succeeded",
+        "elapsedMs": 2026
+      },
+      {
+        "path": "runtimes/comfy-main/stop",
+        "state": "succeeded",
+        "elapsedMs": 7000
+      },
+      {
+        "path": "runtimes/comfy-main/start",
+        "state": "succeeded",
+        "elapsedMs": 8482
+      },
+      {
+        "path": "executors/image/enable",
+        "state": "succeeded",
+        "elapsedMs": 2007
+      },
+      {
+        "path": "runtimes/comfy-main/stop",
+        "state": "succeeded",
+        "elapsedMs": 2040
+      }
+    ]
+  },
+  "publicPathRecheck": {
+    "passed": false,
+    "reason": "Cloud forwarding returned HTTP 502 while loopback probes remained responsive; no inference submitted in this failed attempt."
+  },
+  "lifecycleRecheck": {
+    "passed": true,
+    "transport": "Operator-only temporary SSH forwarding; not product functionality",
+    "startedAt": "2026-09-27T12:59:04.489Z",
+    "finishedAt": "2026-09-27T13:00:33.000Z",
+    "management": {
+      "samples": 27,
+      "errors": 0,
+      "activeSamples": 13,
+      "maxMs": 470,
+      "p95Ms": 376
+    },
+    "results": [
+      {
+        "operation": "video.generate.v1",
+        "status": "cancelled",
+        "jobId": "e76f877a-b6ee-42bd-94fd-accebc7165f4",
+        "profileId": "e223d7601453cf0d32779ba91409a3aa06254a4f7da74e9e267174784d15491b",
+        "output": null,
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "2"
+          }
+        ]
+      },
+      {
+        "operation": "image.generate.v1",
+        "status": "succeeded",
+        "jobId": "4e88833a-7e2e-4ef2-972b-161c1d230a61",
+        "profileId": "5c81e3c63d1ef27dcd220eaf09bdf002bd14e45a3f7370408c36dd723bb63a07",
+        "output": {
+          "id": "8dd6585a-d34d-4f9a-8a5d-80ed989329a8",
+          "size": 305555,
+          "sha256": "3e7ed277a4467ad668bace8ccfd6558ee2304ed9b040305279632ebfb0208542",
+          "kind": "image"
+        },
+        "gpus": [
+          {
+            "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+            "name": "NVIDIA GeForce RTX 5090",
+            "totalMiB": "32607",
+            "usedMiB": "746"
+          }
+        ]
+      }
+    ]
+  },
+  "loopbackManagement": {
+    "samples": 180,
+    "errors": 0,
+    "activeSamples": 27,
+    "maxMs": 265,
+    "p95Ms": 184
+  },
+  "restart": {
+    "identityPreserved": true,
+    "oldManagedPidsGone": true,
+    "restartDoesNotAutostartRuntime": true,
+    "explicitRecoveryPassed": true,
+    "serverConnected": false,
+    "gpusAfterRestart": [
+      {
+        "uuid": "GPU-bba7fa0e-1e9e-11c6-fbfc-003ac28c3ca2",
+        "name": "NVIDIA GeForce RTX 5090",
+        "totalMiB": "32607",
+        "usedMiB": "2"
+      }
+    ],
+    "version": "0.11.0"
+  },
+  "sameImageProfileAfterPathChange": true,
+  "sameSpeechProfileAfterPathChange": true,
+  "regressions": {
+    "serverRoutingAndTransport": 4,
+    "workerManagement": 9,
+    "studioBrowser": 13
+  },
+  "shutdown": {
+    "state": "Stopped",
+    "scheduleRemoved": true
+  },
+  "scope": "Low-step image smoke checks and H3 FL2VA text video; not full quality, Ref2VA, all speech emotions, multi-physical-GPU or Electron native acceptance."
+}

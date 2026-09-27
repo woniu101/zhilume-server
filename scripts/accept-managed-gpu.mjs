@@ -21,7 +21,7 @@ async function manage(path, body, method = body ? 'POST' : 'GET') {
   const r = await fetch(address + '/management/api/' + path, { method, headers: { Authorization: 'Bearer ' + admin, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000) });
   assert.ok(r.ok, 'management status ' + r.status + ': ' + await r.clone().text());
   const data = await r.json();
-  if (path === 'overview') evidence.managementSamples.push({ elapsedMs: Date.now() - start, active: data.tasks.length });
+  if (path === 'overview') evidence.managementSamples.push({ at: new Date().toISOString(), elapsedMs: Date.now() - start, active: data.tasks.length });
   return data;
 }
 async function until(get, test, seconds = 300, label = 'condition') {
@@ -67,13 +67,14 @@ async function settled(job, expected = 'succeeded') {
 let monitoring = true;
 const monitor = (async () => {
   while (monitoring) {
-    try { await manage('overview'); } catch (e) { evidence.managementSamples.push({ error: e.message }); }
+    try { await manage('overview'); } catch (e) { evidence.managementSamples.push({ at: new Date().toISOString(), error: e.message, cause: e.cause?.code || e.cause?.message }); }
     await delay(4000);
   }
 })();
 try {
   const initial = await manage('overview');
-  assert.equal(initial.version, '0.10.0');
+  assert.equal(initial.version, process.env.ZHILUME_EXPECTED_WORKER_VERSION || '0.10.0');
+  evidence.workerVersion = initial.version;
   evidence.workerId = initial.workerId;
   evidence.initialGpus = initial.gpus;
   await operation('runtimes/comfy-main/check');
@@ -95,13 +96,24 @@ try {
     submitted.push(j); return j;
   }
   const imageInput = { modelId: image.modelId, profileId: image.profileId, workflowRevision: image.workflowRevision, prompt: 'A small blue ceramic cup on a wooden table, soft daylight.', negativePrompt: '', referenceAssetIds: [], width: 512, height: 512, steps: 5, seed: 27, outputFormat: 'png' };
-  await settled(await submit('image.generate.v1', imageInput));
-  const bytes = await readFile(process.env.ZHILUME_AUDIO_FILE);
-  const upload = await app.inject({ method: 'POST', url: '/api/v1/assets/uploads?filename=speaker.wav', headers: { Authorization: 'Bearer local-managed-fixture', 'Content-Type': 'application/octet-stream' }, payload: bytes });
-  assert.ok(upload.statusCode < 300, upload.body);
-  await settled(await submit('audio.speech.v1', { modelId: speech.modelId, profileId: speech.profileId, workflowRevision: speech.workflowRevision, text: '这是织镜的托管执行器切换测试。', language: 'ZH', speed: 1, speaker: { assetId: upload.json().id, start: 0, end: 2 }, emotionMode: 'follow', emotionAlpha: .6, emotionVector: Array(8).fill(0), emotionText: '', emotionReference: { assetId: '', start: 0, end: 2 } }));
   const videoInput = { modelId: video.modelId, profileId: video.profileId, workflowRevision: video.workflowRevision, mode: 'text', prompt: 'A small blue sphere slowly rotates on a wooden table in warm daylight. Static camera. Gentle room ambience.', width: 512, height: 288, frames: 124, steps: 20, seed: 42, includeAudio: true, references: [] };
-  await settled(await submit('video.generate.v1', videoInput));
+  if (!process.argv.includes('--lifecycle-only')) {
+    const firstImage = await settled(await submit('image.generate.v1', imageInput));
+    if (process.argv.includes('--image-variants')) {
+      const edit = models.image.find(x => x.id === 'qwen-image-2.1' && x.ready)?.profiles[0];
+      assert.ok(edit, 'Qwen Image 2.1 must be explicitly configured for image variant acceptance');
+      const editInput = { ...imageInput, modelId: edit.modelId, profileId: edit.profileId, workflowRevision: edit.workflowRevision };
+      const secondImage = await settled(await submit('image.generate.v1', { ...editInput, prompt: 'A small red ceramic teapot on a wooden table, soft daylight.' }));
+      const { width, height, ...referenceInput } = editInput;
+      await settled(await submit('image.edit.v1', { ...referenceInput, prompt: 'Change the blue cup to yellow. Keep its shape, table and lighting unchanged.', referenceAssetIds: [firstImage.outputAssetId] }));
+      await settled(await submit('image.reference.v1', { ...referenceInput, prompt: 'Place the blue cup from image 1 beside the red teapot from image 2 on the same wooden table. Keep both objects fully visible.', referenceAssetIds: [firstImage.outputAssetId, secondImage.outputAssetId] }));
+    }
+    const bytes = await readFile(process.env.ZHILUME_AUDIO_FILE);
+    const upload = await app.inject({ method: 'POST', url: '/api/v1/assets/uploads?filename=speaker.wav', headers: { Authorization: 'Bearer local-managed-fixture', 'Content-Type': 'application/octet-stream' }, payload: bytes });
+    assert.ok(upload.statusCode < 300, upload.body);
+    await settled(await submit('audio.speech.v1', { modelId: speech.modelId, profileId: speech.profileId, workflowRevision: speech.workflowRevision, text: '这是织镜的托管执行器切换测试。', language: 'ZH', speed: 1, speaker: { assetId: upload.json().id, start: 0, end: 2 }, emotionMode: 'follow', emotionAlpha: .6, emotionVector: Array(8).fill(0), emotionText: '', emotionReference: { assetId: '', start: 0, end: 2 } }));
+    await settled(await submit('video.generate.v1', videoInput));
+  }
   const cancel = await submit('video.generate.v1', { ...videoInput, steps: 50 });
   await until(() => api('/jobs/' + cancel.id), j => j.status === 'running' && String(j.stage).includes('模型执行中'), 240, 'video inference started');
   await delay(10000);
