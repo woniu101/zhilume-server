@@ -83,3 +83,15 @@ H3 规则依据：[官方 Skill](https://github.com/MiniMax-AI/MiniMax-H3/tree/m
 画布工具栏提供“批量 / 流程”，选中多个节点后提交；“运行流程”逐条确认哪些输入等待新结果。任务列表使用上述中文阶段及重试/取消操作。Server 管理台负责语言服务与多 Worker 总览；Worker 面板不重复项目/画布功能。
 
 Worker 面板有概览、执行器、环境、接入、诊断五页。复杂部署配置暂采用 JSON 编辑器并提供仓库示例；普通安装用户先读取并修正既有环境，再显式检查和启用。服务在线、检查通过、真实推理通过分别展示，不将任何一个状态冒充其他状态。
+
+## Worker 部署管理增量接口
+
+以下接口仅接受部署管理凭证，不接受 Server 调度凭证，模型任务 wire 协议不变：
+
+- `GET /management/api/environment-templates`：三个引擎的配置模板；权重量化与固定组件标识为空，必须根据实际部署填写。模板随 Worker 打包，不依赖源码仓库或 Node。
+- `PUT /management/api/executors/{kind}/config`：保存前验证配置结构；无效结构返回 400，不修改原配置。保存仍为异步操作，响应 operationId，完成后停用并清空旧检查结果。
+- `overview.executors[].checks`：检查项包含 id/title/state/detail/remedy。state 为 checking/passed/failed/skipped；失败不提前遮蔽其他独立检查项。
+- `operations[]`：新增 startedAt/finishedAt，持续运行保持 running，最终 succeeded/failed，result 包含检查明细；不返回内部 task 对象。
+- `GET /management/api/executors/{kind}/logs`：最近 60 条脱敏部署事件（尾部读取上限 128000 字节），含开始、结束、检查明细。引擎限定 image/speech/video；读取无写入副作用，服务重启后仍可读。
+
+ComfyUI 服务由部署者管理进程、Python、GPU 和模型目录。Qwen/H3 表单配置服务入口与模型规格，IndexTTS 表单配置本机独立 Python 路径。环境检查不代表 GPU 推理已验收。
