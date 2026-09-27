@@ -1,3 +1,4 @@
+import { availableProfiles, validateIdentity } from './execution.js';
 import { readFileSync } from 'node:fs';
 import { AppError, text, requireValue } from './domain.js';
 import { online } from './image-operations.js';
@@ -20,17 +21,17 @@ export function validateVideoProfiles(value: any): any[] {
       !Array.isArray(p.frames) || !p.frames.length || p.frames.length > 14 || p.frames.some((n: any) => !frames(n)) ||
       !int(p.defaultSteps,1,50) || p.maxSteps !== 50 || !p.referenceLimits || !int(p.referenceLimits.image,0,9) || !int(p.referenceLimits.video,0,3) || !int(p.referenceLimits.audio,0,3)) return fail('视频配置与模型契约不一致');
     seen.add(p.profileId);
-    return { modelId: model.id, profileId: p.profileId, workflowRevision: p.workflowRevision, modes: model.modes, sizes: p.sizes, frames: p.frames,
+    return { identity: validateIdentity(p), modelId: model.id, profileId: p.profileId, workflowRevision: p.workflowRevision, modes: model.modes, sizes: p.sizes, frames: p.frames,
       fps: 24, referenceLimits: { image:p.referenceLimits.image, video:p.referenceLimits.video, audio:p.referenceLimits.audio }, defaultSteps:p.defaultSteps, maxSteps:50, validation:'unverified' };
   });
 }
 export function videoAvailability(workers: any[]) {
-  return videoModels.map(m => { const profiles = [...new Map(workers.filter(online).flatMap(w => w.videoProfiles || []).filter(p => p.modelId === m.id).map(p => [p.profileId,p])).values()]; return { ...m, profiles, ready: profiles.length > 0 }; });
+  return videoModels.map(m => { const profiles = availableProfiles(workers, 'videoProfiles', m.id); return { ...m, profiles, ready: profiles.some(p => p.readyCount > 0) }; });
 }
 export function validateVideoInput(b: any, workers: any[], lookup: (id: string) => any) {
   const model = videoAvailability(workers).find(m => m.id === b?.modelId);
   const p: any = model?.profiles.find((p: any) => p.profileId === b.profileId);
-  if (!p || b.workflowRevision !== p.workflowRevision) throw new AppError('model_unavailable','视频配置已离线或变更，请刷新',409);
+  if (!p || b.workflowRevision !== p.workflowRevision) throw new AppError('model_unavailable','该视频规格未登记',409);
   if (!p.modes.includes(b.mode) || !p.frames.includes(b.frames) || !p.sizes.some((s: number[]) => s[0] === b.width && s[1] === b.height) || !int(b.seed,0,Number.MAX_SAFE_INTEGER) || !int(b.steps,1,50) || typeof b.includeAudio !== 'boolean') return fail('视频参数超出执行配置');
   if (!Array.isArray(b.references) || b.references.length > 12) return fail('参考最多 12 个');
   const roles = b.references.map((r: any) => r?.role);

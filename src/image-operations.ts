@@ -1,3 +1,4 @@
+import { availableProfiles, validateIdentity } from './execution.js';
 import { readFileSync } from "node:fs";
 import { AppError, requireValue, text } from "./domain.js";
 const catalog = JSON.parse(readFileSync(new URL("../contracts/operation-catalog.json", import.meta.url), "utf8"));
@@ -24,15 +25,15 @@ export function validateImageProfiles(value: unknown): any[] {
         p.maxSteps !== 100 || p.validation !== "unverified")
       throw new AppError("invalid_profiles", "图片执行配置与模型契约不一致");
     seen.add(p.profileId);
-    return { modelId: p.modelId, profileId: p.profileId, workflowRevision: p.workflowRevision, operations: [...new Set(p.operations)],
+    return { identity: validateIdentity(p), modelId: p.modelId, profileId: p.profileId, workflowRevision: p.workflowRevision, operations: [...new Set(p.operations)],
       maxReferences: p.maxReferences, formats: [...new Set(p.formats)], minSize: p.minSize, maxSize: p.maxSize, sizeStep: p.sizeStep,
       referenceResolution: p.referenceResolution, defaultSteps: p.defaultSteps, maxSteps: p.maxSteps, validation: p.validation };
   });
 }
 export function modelAvailability(workers: any[]) {
   return imageModels.map(model => {
-    const profiles = [...new Map(workers.filter(online).flatMap(w => w.imageProfiles || []).filter(p => p.modelId === model.id).map(p => [p.profileId, p])).values()];
-    return { ...model, profiles, ready: profiles.length > 0 };
+    const profiles = availableProfiles(workers, 'imageProfiles', model.id);
+    return { ...model, profiles, ready: profiles.some(p => p.readyCount > 0) };
   });
 }
 export function validateImageInput(operation: string, b: any, workers: any[], lookup: (id: string) => any) {
@@ -40,7 +41,7 @@ export function validateImageInput(operation: string, b: any, workers: any[], lo
   if (!model?.operations.includes(operation)) throw new AppError("invalid_model", "该模型不支持所选操作");
   const profile: any = modelAvailability(workers).find(m => m.id === model.id)!.profiles.find((p: any) => p.profileId === b.profileId);
   if (!profile || profile.workflowRevision !== b.workflowRevision || !profile.operations.includes(operation))
-    throw new AppError("model_unavailable", "该模型执行配置已离线或变更，请刷新后重试", 409);
+    throw new AppError("model_unavailable", "该执行规格未登记，请先接入部署此规格的 Worker", 409);
   const refs = b.referenceAssetIds;
   const minRefs = operation === "image.generate.v1" ? 0 : operation === "image.edit.v1" ? 1 : 2;
   const maxRefs = operation === "image.generate.v1" ? 0 : operation === "image.edit.v1" ? 1 : profile.maxReferences;

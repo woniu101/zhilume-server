@@ -21,9 +21,9 @@ test('Server bundled FFmpeg exports without Workers and persists lineage', { tim
   };
   let worker: ReturnType<typeof spawn> | undefined;
   t.after(async () => {
-    if (worker && worker.exitCode === null) { const exited = once(worker, 'exit'); worker.kill(); await exited; }
+    await stopWorker(worker);
     await app.close();
-    if (resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-media-test-')) await rm(root, { recursive: true, force: true });
+    if (resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-media-test-')) await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const source = join(root, 'source.mp4');
   execFileSync(ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=s=128x72:r=10:d=2', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', source], { windowsHide: true });
@@ -67,7 +67,7 @@ test('Server bundled FFmpeg exports without Workers and persists lineage', { tim
 test('Server serial queue cancels, stays responsive, restarts and retries independently of Workers', { timeout: 60000 }, async t => {
   const root = await mkdtemp(join(tmpdir(), 'zhilume-queue-test-'));
   let app = await createApp({ root: join(root, 'server'), token: 'queue-test', tickMs: 50 });
-  t.after(async () => { await app.close(); await rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await app.close(); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
   const headers = { Authorization: 'Bearer queue-test' };
   const call = async (url: string, payload?: any) => {
     const res = await app.inject({ method: payload ? 'POST' : 'GET', url: '/api/v1' + url, headers, ...(payload ? { payload } : {}) });
@@ -97,3 +97,4 @@ test('Server serial queue cancels, stays responsive, restarts and retries indepe
   await call('/jobs/' + interrupted.id + '/retry', {});
   const done = await wait(interrupted.id, 'succeeded'); assert.ok(done.outputAssetId); assert.equal(done.attempts.length, 1);
 });
+import { stopWorker } from './worker-helper.js';

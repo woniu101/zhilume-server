@@ -12,7 +12,7 @@ test('Server with no listening port connects to Worker, authenticates and archiv
   let app = await createApp({ root: join(root, 'server'), token: 'outbound-test-only', tickMs: 50 });
   t.after(async () => {
     await app.close(); await stopWorker(peer.child);
-    assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-outbound-test-')); await rm(root, { recursive: true, force: true });
+    assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-outbound-test-')); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const call = (method: any, path: string, body?: object) => app.inject({ method, url: '/api/v1' + path, headers: { Authorization: 'Bearer outbound-test-only' }, payload: body });
   const config = { address: peer.address, credential: peer.credential };

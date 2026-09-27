@@ -18,7 +18,7 @@ test("admin surface identity, viewport roundtrip and non-destructive folder mana
     if (
       resolve(root).startsWith(resolve(tmpdir()) + sep + "zhilume-refinements-")
     )
-      await rm(root, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const req = (method: any, url: string, payload?: any) =>
     app.inject({ method, url: "/api/v1" + url, headers, payload });
@@ -91,7 +91,7 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
     if (
       resolve(root).startsWith(resolve(tmpdir()) + sep + "zhilume-concurrency-")
     )
-      await rm(root, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const api = async (path: string, method = "GET", body?: any) => {
     const r = await fetch(base + "/api/v1" + path, {
@@ -120,7 +120,7 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
     const listener = createServer((req, res) => {
       if (req.headers.authorization !== "Bearer " + credential) { res.writeHead(401).end(); return; }
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ name: "Zhilume Worker", workerId, workerName: "test" + i, platform: "test", protocolVersion: "2.0" }));
+      res.end(JSON.stringify({ name: "Zhilume Worker", workerId, workerName: "test" + i, platform: "test", protocolVersion: "3.0" }));
     });
     const wss = new WebSocketServer({ server: listener });
     listener.listen(0, "127.0.0.1"); await once(listener, "listening"); listeners.push(listener);
@@ -138,7 +138,7 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
     ) =>
       ws.send(
         JSON.stringify({
-          protocolVersion: "2.0",
+          protocolVersion: "3.0",
           messageId: crypto.randomUUID(),
           type,
           payload,
@@ -152,7 +152,7 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
           ...(sequence === undefined ? {} : { sequence }),
         }),
       );
-    send("hello", { workerId, capabilities: ["mock.text.echo.v1"], activeAttempts: [] });
+    send("hello", { workerId, capabilities: ["mock.text.echo.v1"], executionSpecs: [], deployment: { capacity: 1, resourceIds: ["cpu:" + workerId] }, activeAttempts: [] });
     await wait(
       () => messages,
       (m) => m.some((x: any) => x.type === "welcome"),
@@ -188,6 +188,7 @@ test("two workers receive separate jobs and stale attempts cannot alter a retry"
   const peer = peers[0],
     old = assignments[0];
   peer.send("task.failed", { message: "injected failure" }, old);
+  peer.send("heartbeat", { activeAttempts: [] });
   await wait(
     () => api("/jobs/" + old.jobId),
     (j) => j.status === "failed",

@@ -1,0 +1,77 @@
+{
+  "startedAt": "2026-09-27T05:29:06.954Z",
+  "serverListening": false,
+  "results": [
+    {
+      "operation": "image.generate.v1",
+      "status": "succeeded",
+      "jobId": "b280343d-43bd-432d-85f1-54769e34df4e",
+      "profileId": "5c81e3c63d1ef27dcd220eaf09bdf002bd14e45a3f7370408c36dd723bb63a07",
+      "output": {
+        "id": "5c3db29f-7810-4f2f-8a23-56a92b5549dc",
+        "size": 315283,
+        "sha256": "a9d86975963f6202aa1d69fb714f09fda541b64c61769c394939472fd7919490"
+      },
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "778"
+        }
+      ]
+    },
+    {
+      "operation": "audio.speech.v1",
+      "status": "succeeded",
+      "jobId": "b2b1af50-a59d-437c-a190-fc5ede8e2617",
+      "profileId": "b5d136f7398edaa17d76afcce32877087c43d2461592d68247c3b66e0be15b2f",
+      "output": {
+        "id": "ce8839fc-7e2e-4554-bc76-7e51b01116a4",
+        "size": 124352,
+        "sha256": "f89a3d2908c4cf67d4f239d4d84a6c45b4b36225e45d5d230efda657401b84b5"
+      },
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "778"
+        }
+      ]
+    },
+    {
+      "operation": "image.generate.v1",
+      "status": "cancelled",
+      "jobId": "d04b1154-d2d1-42a7-91a5-094dc53d27ab",
+      "profileId": "5c81e3c63d1ef27dcd220eaf09bdf002bd14e45a3f7370408c36dd723bb63a07",
+      "output": null,
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "778"
+        }
+      ]
+    }
+  ],
+  "managementLatencyMs": [
+    223,
+    223,
+    212,
+    218,
+    247,
+    221,
+    323,
+    217
+  ],
+  "finishedAt": "2026-09-27T05:30:26.351Z",
+  "upgrade": {
+    "identityAndCredentialsPreserved": true,
+    "bindingPreserved": true,
+    "offlineManagement": true,
+    "executorFailureIsolated": true,
+    "workerVersion": "0.9.0",
+    "idleGpuMiB": [
+      "778"
+    ]
+  }
+}

@@ -10,7 +10,7 @@ test("desktop and separate web origins can save, rename and remove through prefl
   t.after(async () => {
     await app.close();
     if (resolve(root).startsWith(resolve(tmpdir()) + sep + "zhilume-cors-"))
-      await rm(root, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   for (const origin of ["app://zhilume-studio", "http://127.0.0.1:5173"])
     for (const method of ["PUT", "PATCH", "DELETE"]) {

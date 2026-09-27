@@ -1,5 +1,9 @@
 # 开发与验收记录
 
+当前版本：Studio 0.13.0 / Server 0.10.0 / Worker 0.9.0。统一模型、独立语言服务、多 Worker 队列、显式依赖和 Worker 管理面板已实现；本轮测试与未覆盖项以 [最新验收](model-scheduling-acceptance-2026-09-27.md) 为准。下文为历史版本记录。
+
+
+
 日期：2026-09-27。当前 Studio 0.11.0 / Server 0.8.0 / Worker 0.7.0。旧 zhihua-service 只作能力参考，当前为初版，需要时直接重构，不保留历史兼容层。
 
 ## IndexTTS 语音接入（本机阶段）

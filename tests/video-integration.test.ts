@@ -15,6 +15,7 @@ test('H3 transport: explicit references, MP4 archive, cancellation and recovery 
   const root=await mkdtemp(join(tmpdir(),'zhilume-video-test-'));
   const app=await createApp({root:join(root,'server'),token:'video-test-only',tickMs:50});
   const config=JSON.parse(await readFile('../zhilume-worker/config/video.example.json','utf8'));
+  config.profiles.forEach((p: any) => { p.identity = { revision: 'fixture-v1', quantization: 'fp32', artifacts: Object.fromEntries(Object.keys(p.models).map(k => [k, 'revision:fixture-v1-'+k])) }; });
   config.ffmpeg=ffmpeg;
   config.ffprobe=process.env.ZHILUME_TEST_FFPROBE || execFileSync(process.platform==='win32'?'where.exe':'which',['ffprobe'],{encoding:'utf8',windowsHide:true}).trim().split(/\r?\n/)[0];
   const output=join(root,'fixture.mp4');
@@ -38,7 +39,7 @@ test('H3 transport: explicit references, MP4 archive, cancellation and recovery 
     res.setHeader('content-type','application/json');res.end(JSON.stringify(result));
   });
   let peer:Awaited<ReturnType<typeof startWorker>>|undefined;
-  t.after(async()=>{await stopWorker(peer?.child);await app.close();await new Promise<void>(r=>comfy.close(()=>r()));if(resolve(root).startsWith(resolve(tmpdir())+sep+'zhilume-video-test-'))await rm(root,{recursive:true,force:true});});
+  t.after(async()=>{await stopWorker(peer?.child);await app.close();await new Promise<void>(r=>comfy.close(()=>r()));if(resolve(root).startsWith(resolve(tmpdir())+sep+'zhilume-video-test-'))await rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:100});});
   comfy.listen(0,'127.0.0.1');await once(comfy,'listening');config.url=`http://127.0.0.1:${(comfy.address() as any).port}`;
   const configPath=join(root,'video.json');await writeFile(configPath,JSON.stringify(config));
   const headers={Authorization:'Bearer video-test-only'};

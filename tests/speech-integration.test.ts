@@ -13,7 +13,7 @@ test('speech real transport and owned runner: reference roles, WAV archive, fail
   let peer: Awaited<ReturnType<typeof startWorker>> | undefined;
   t.after(async () => {
     await stopWorker(peer?.child); await app.close();
-    if (resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-speech-test-')) await rm(root, { recursive: true, force: true });
+    if (resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-speech-test-')) await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const upstream = join(root, 'fixture-upstream');
   await mkdir(join(upstream, 'indextts/utils'), { recursive: true });
@@ -33,7 +33,7 @@ class IndexTTS2:
 `);
   const configPath = join(root, 'speech.json');
   const python = process.env.ZHILUME_TEST_PYTHON || resolve('../zhilume-worker/.venv/' + (process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'));
-  await writeFile(configPath, JSON.stringify({ python, repository: upstream, modelDirectory: upstream, ffmpeg, enableEmotionText: false }));
+  await writeFile(configPath, JSON.stringify({ identity: { revision: 'fixture-v1', quantization: 'fp32', artifacts: { tts: 'revision:fixture-v1' } }, python, repository: upstream, modelDirectory: upstream, ffmpeg, enableEmotionText: false }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const headers = { Authorization: 'Bearer speech-test-only' };
   const call = async (path: string, payload?: any) => {

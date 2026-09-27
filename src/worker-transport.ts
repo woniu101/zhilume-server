@@ -23,7 +23,7 @@ export async function probeWorker(config: WorkerEndpoint, serverId?: string) {
   if (!response.ok || Number(response.headers.get('content-length')) > 65536) throw new AppError('worker_invalid_service', '地址未提供有效的 Worker 服务', 400);
   let info: any;
   try { const raw = await response.text(); if (raw.length > 65536) throw Error(); info = JSON.parse(raw); } catch { throw new AppError('worker_invalid_service', '响应不是有效的 Worker 服务', 400); }
-  if (info.name !== 'Zhilume Worker' || info.protocolVersion !== '2.0' || typeof info.workerId !== 'string' || !/^[0-9a-f-]{36}$/.test(info.workerId))
+  if (info.name !== 'Zhilume Worker' || info.protocolVersion !== '3.0' || typeof info.workerId !== 'string' || !/^[0-9a-f-]{36}$/.test(info.workerId))
     throw new AppError('worker_protocol_mismatch', 'Worker 身份或协议版本不匹配，请更新 Worker', 400);
   if (serverId && info.boundServerId && info.boundServerId !== serverId)
     throw new AppError('worker_already_bound', '此 Worker 已绑定其他 Server，请使用独立 Worker 状态目录', 409);

@@ -9,7 +9,7 @@ export async function startWorker(state: string, args: string[] = [], port?: num
   const python = process.env.ZHILUME_TEST_PYTHON || resolve('../zhilume-worker/.venv/' + (process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'));
   const child = launcher
     ? spawn('bash', ['deploy/run.sh'], { cwd: resolve('../zhilume-worker'), env: { ...process.env, ZHILUME_STATE: state, ZHILUME_HOST: '127.0.0.1', ZHILUME_PORT: String(port), ZHILUME_ENABLE_IMAGE: '0' }, stdio: ['ignore', 'ignore', 'pipe'] })
-    : spawn(python, [...(testEntry ? [testEntry] : ['-m', 'zhilume_worker']), '--port', String(port), '--state', state, ...args], { cwd: resolve('../zhilume-worker'), windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+    : spawn(python, [...(testEntry ? [testEntry] : [args.some(a => a.startsWith('--enable-')) ? 'tests/fixture_worker.py' : '-m', ...(args.some(a => a.startsWith('--enable-')) ? [] : ['zhilume_worker'])]), '--port', String(port), '--state', state, ...args], { cwd: resolve('../zhilume-worker'), windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
   let log = ''; child.stderr?.on('data', b => { log = (log + b.toString()).slice(-2500); });
   const address = `http://127.0.0.1:${port}`;
   for (let i = 0; i < 300; i++) {
@@ -25,5 +25,11 @@ export async function startWorker(state: string, args: string[] = [], port?: num
 }
 export async function stopWorker(child?: ChildProcess) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return;
-  const exited = once(child, 'exit'); child.kill(); await exited;
+  const exited = once(child, 'exit');
+  if (process.platform === 'win32') {
+    // Windows venv launchers can own a second Python process. Stop the test tree.
+    const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    await once(killer, 'exit');
+  } else child.kill();
+  await exited;
 }

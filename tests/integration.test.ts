@@ -1,4 +1,4 @@
-import { startWorker } from "./worker-helper.js";
+import { startWorker, stopWorker } from "./worker-helper.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
@@ -28,11 +28,7 @@ async function waitFor<T>(
   }
   throw new Error("Timed out waiting for state: " + JSON.stringify(lastValue));
 }
-async function stop(child: ChildProcess) {
-  if (child.exitCode !== null) return;
-  child.kill();
-  await Promise.race([once(child, "exit"), pause(3000)]);
-}
+const stop = stopWorker;
 
 test("HTTP persistence, authorization, optimistic revision, immutable assets and idempotency", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "zhilume-server-test-"));
@@ -40,7 +36,7 @@ test("HTTP persistence, authorization, optimistic revision, immutable assets and
   t.after(async () => {
     await app.close();
     if (resolve(root).startsWith(resolve(tmpdir()) + sep + "zhilume-server-test-"))
-      await rm(root, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const req = (method: any, url: string, payload?: any) =>
     app.inject({ method, url, headers, payload });
@@ -186,7 +182,7 @@ test(
       if (
         resolve(root).startsWith(resolve(tmpdir()) + sep + "zhilume-worker-test-")
       )
-        await rm(root, { recursive: true, force: true });
+        await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     });
     const api = async (path: string, method = "GET", body?: any) => {
       const response = await fetch(base + "/api/v1" + path, {

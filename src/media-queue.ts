@@ -17,7 +17,7 @@ export class ServerMediaQueue {
   constructor(private store: Store, private assets: Assets, private changed: (job: any) => void, executable?: string) {
     this.executable = executable || (ffmpeg || '').replace('app.asar', 'app.asar.unpacked');
     this.ready = existsSync(this.executable);
-    for (const job of store.all('job')) if (job.executor === 'server' && !terminal.has(job.status) && job.status !== 'queued') {
+    for (const job of store.all('job')) if (job.executor === 'server' && ['assigned', 'running', 'cancel_requested'].includes(job.status)) {
       Object.assign(job, { status: 'interrupted', stage: 'Server 已重启', error: '本地媒体任务已中断，请重试', errorCode: 'server_restarted' });
       this.changed(job);
     }

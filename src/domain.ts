@@ -9,6 +9,7 @@ export const terminal = new Set([
   "failed",
   "cancelled",
   "interrupted",
+  "blocked",
 ]);
 export const operations = ["mock.text.echo.v1", "mock.media.copy.v1"];
 export const capabilities = [

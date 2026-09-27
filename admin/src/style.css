@@ -311,3 +311,5 @@ td small {
 .worker-connection-form { display: grid; gap: 16px; }
 .worker-connection-form label { display: grid; gap: 8px; }
 .worker-connection-form input { width: 100%; }
+
+.provider-form { display:grid;gap:12px;max-width:760px; }.provider-form label { display:flex;align-items:center;gap:10px; }.provider-form label input:not([type=checkbox]) { flex:1; }

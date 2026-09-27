@@ -1,4 +1,6 @@
-import { startWorker } from "./worker-helper.js";
+import { fingerprint } from '../src/execution.js';
+function signed(p: any) { const { profileId, ...spec } = p; spec.identity ||= { revision: 'fixture-v1', quantization: 'fp32', artifacts: { model: 'revision:fixture-v1' } }; return { ...spec, profileId: fingerprint(spec) }; }
+import { startWorker, stopWorker } from "./worker-helper.js";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
@@ -12,10 +14,10 @@ import { imageModels, validateImageInput, validateImageProfiles, supportsImageJo
 
 test('profile validation, scheduling isolation, reference count and dimensions', () => {
   const model = imageModels[1];
-  const profile = { modelId: model.id, profileId: 'a'.repeat(64), workflowRevision: model.workflowRevision, operations: model.operations,
-    maxReferences: 4, formats: model.formats, minSize: 256, maxSize: 1536, sizeStep: 32, referenceResolution: 1024, defaultSteps: 25, maxSteps: 100, validation: 'unverified' };
+  const profile = signed({ modelId: model.id, profileId: 'a'.repeat(64), workflowRevision: model.workflowRevision, operations: model.operations,
+    maxReferences: 4, formats: model.formats, minSize: 256, maxSize: 1536, sizeStep: 32, referenceResolution: 1024, defaultSteps: 25, maxSteps: 100, validation: 'unverified' });
   assert.equal(validateImageProfiles([profile]).length, 1);
-  assert.equal(validateImageProfiles([{ ...profile, maxReferences: 10 }]).length, 1);
+  assert.equal(validateImageProfiles([signed({ ...profile, maxReferences: 10 })]).length, 1);
   assert.throws(() => validateImageProfiles([{ ...profile, maxReferences: 11 }]));
   assert.throws(() => validateImageProfiles([{ ...profile, validation: 'verified' }]));
   const w = { connected: true, lastHeartbeat: Date.now(), imageProfiles: [profile] };
@@ -26,7 +28,7 @@ test('profile validation, scheduling isolation, reference count and dimensions',
   assert.equal(validated.referenceResolution, 1024);
   assert.throws(() => validateImageInput('image.reference.v1', { ...input, width: 1024 }, [w], lookup));
   assert.throws(() => validateImageInput('image.edit.v1', input, [w], lookup));
-  assert.throws(() => validateImageInput('image.reference.v1', input, [{ ...w, connected: false }], lookup));
+  assert.doesNotThrow(() => validateImageInput('image.reference.v1', input, [{ ...w, connected: false }], lookup));
   assert.equal(supportsImageJob(w, { operation: 'image.reference.v1', input }), true);
   assert.equal(supportsImageJob(w, { operation: 'image.reference.v1', input: { ...input, profileId: 'b'.repeat(64) } }), false);
 });
@@ -35,6 +37,7 @@ test('real Python worker against local fake Comfy: text generation, ordered mult
   const root = await mkdtemp(join(tmpdir(), 'zhilume-image-test-'));
   const app = await createApp({ root: join(root, 'server'), token: 'image-test-only', tickMs: 50 });
   const config = JSON.parse(await readFile('../zhilume-worker/config/comfy.example.json', 'utf8'));
+  config.profiles.forEach((p: any) => { p.identity = { revision: 'fixture-v1', quantization: 'fp32', artifacts: Object.fromEntries(Object.keys(p.models).map(k => [k, 'revision:fixture-v1-'+k])) }; });
   const info: any = Object.fromEntries(imageModels.flatMap(m => m.requiredNodes).map(n => [n, {}]));
   for (const [node, field, key] of [['UNETLoader', 'unet_name', 'diffusion'], ['CLIPLoader', 'clip_name', 'clip'], ['VAELoader', 'vae_name', 'vae']])
     info[node] = { input: { required: { [field]: [config.profiles.map((p: any) => p.models[key])] } } };
@@ -65,9 +68,9 @@ test('real Python worker against local fake Comfy: text generation, ordered mult
   });
   let worker: ReturnType<typeof spawn> | undefined;
   t.after(async () => {
-    if (worker && worker.exitCode === null) { const done = once(worker, 'exit'); worker.kill(); await done; }
+    await stopWorker(worker);
     await app.close(); await new Promise<void>(r => comfy.close(() => r()));
-    if (resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-image-test-')) await rm(root, { recursive: true, force: true });
+    if (resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-image-test-')) await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   comfy.listen(0, '127.0.0.1'); await once(comfy, 'listening');
   config.url = `http://127.0.0.1:${(comfy.address() as any).port}`;
@@ -79,10 +82,10 @@ test('real Python worker against local fake Comfy: text generation, ordered mult
     const res = await app.inject({ method: body ? 'POST' : 'GET', url: '/api/v1' + path, headers, payload: body });
     assert.ok(res.statusCode < 300, res.body); return res.json();
   };
-  let log = '';
+  let log = ''; let last: any;
   async function wait(get: () => Promise<any>, ready: (v: any) => boolean) {
-    for (let i = 0; i < 250; i++) { const v = await get(); if (ready(v)) return v; await new Promise(r => setTimeout(r, 100)); }
-    throw new Error('Worker timed out: ' + log);
+    for (let i = 0; i < 250; i++) { const v = await get(); last=v; if (ready(v)) return v; await new Promise(r => setTimeout(r, 100)); }
+    throw new Error('Worker timed out: ' + JSON.stringify(last) + log);
   }
   const peer = await startWorker(join(root, 'worker'), ['--comfy-config', configPath, '--enable-image-execution']);
   worker = peer.child;

@@ -75,6 +75,8 @@ export const sizeLabel = (bytes: number) =>
     ? `${(bytes / 1024).toFixed(1)} KB`
     : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 export const statusLabel: Record<string, string> = {
+  waiting_upstream: "等待上游",
+  blocked: "上游失败，已阻塞",
   queued: "排队中",
   assigned: "准备执行",
   running: "执行中",

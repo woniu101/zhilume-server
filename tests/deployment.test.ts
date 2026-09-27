@@ -19,7 +19,7 @@ test('Linux deployment launcher registers, returns output and reuses its private
   t.after(async () => {
     await stop(); await app.close();
     assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep + 'zhilume-deployment-test-'));
-    await rm(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   await app.listen({ host: '127.0.0.1', port: 0 });
   const base = `http://127.0.0.1:${(app.server.address() as any).port}`;

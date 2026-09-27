@@ -1,3 +1,4 @@
+import { availableProfiles, validateIdentity } from './execution.js';
 import { readFileSync } from 'node:fs';
 import { AppError, text, requireValue } from './domain.js';
 import { online } from './image-operations.js';
@@ -20,17 +21,17 @@ export function validateSpeechProfiles(value: unknown): any[] {
       !Array.isArray(p.emotionModes) || !p.emotionModes.includes('follow') || p.emotionModes.some((s: string) => !model.emotionModes.includes(s)))
       throw new AppError('invalid_profiles', '语音执行配置与模型契约不一致');
     ids.add(p.profileId);
-    return { modelId: model.id, profileId: p.profileId, workflowRevision: p.workflowRevision, upstreamRevision: p.upstreamRevision,
+    return { identity: validateIdentity(p), modelId: model.id, profileId: p.profileId, workflowRevision: p.workflowRevision, upstreamRevision: p.upstreamRevision,
       maxTextCharacters: p.maxTextCharacters, languages: [...new Set(p.languages)], emotionModes: [...new Set(p.emotionModes)], validation: 'unverified' };
   });
 }
 export function speechAvailability(workers: any[]) {
-  return speechModels.map(m => { const profiles = [...new Map(workers.filter(online).flatMap(w => w.speechProfiles || []).filter(p => p.modelId === m.id).map(p => [p.profileId, p])).values()]; return { ...m, profiles, ready: profiles.length > 0 }; });
+  return speechModels.map(m => { const profiles = availableProfiles(workers, 'speechProfiles', m.id); return { ...m, profiles, ready: profiles.some(p => p.readyCount > 0) }; });
 }
 export function validateSpeechInput(b: any, workers: any[], lookup: (id: string) => any) {
   const model = speechModels.find(m => m.id === b?.modelId);
   const profile: any = model && speechAvailability(workers).find(m => m.id === model.id)!.profiles.find((p: any) => p.profileId === b.profileId);
-  if (!profile || profile.workflowRevision !== b.workflowRevision) throw new AppError('model_unavailable', '语音配置已离线或变更，请刷新后重试', 409);
+  if (!profile || profile.workflowRevision !== b.workflowRevision) throw new AppError('model_unavailable', '该语音规格未登记', 409);
   if (!profile.languages.includes(b.language) || !profile.emotionModes.includes(b.emotionMode) || !finite(b.speed, model.minSpeed, model.maxSpeed) || !finite(b.emotionAlpha, 0, 1)) throw new AppError('invalid_parameters', '语言、语速或情绪模式不受支持');
   const content = text(b.text, profile.maxTextCharacters);
   const reference = (r: any) => {

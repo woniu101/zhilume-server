@@ -1,3 +1,5 @@
+import { LanguageService, languageOperations } from './language.js';
+import { fingerprint as taskFingerprint, validateDeployment, route, validateGraph, bindInput } from './execution.js';
 import { videoCapabilities, isVideoOperation, videoAvailability, validateVideoInput, validateVideoProfiles, supportsVideoJob } from './video-operations.js';
 import Fastify, { LogController } from "fastify";
 import cors from "@fastify/cors";
@@ -30,7 +32,7 @@ import { mediaCapabilities, validateMediaInput, validateProvenance } from "./med
 import { imageCapabilities, isImageOperation, modelAvailability, validateImageInput, validateImageProfiles, supportsImageJob } from "./image-operations.js";
 import { speechCapabilities, isSpeechOperation, speechAvailability, validateSpeechInput, validateSpeechProfiles, supportsSpeechJob } from './speech-operations.js';
 const executableCapabilities = [...capabilities, ...mediaCapabilities, ...imageCapabilities, ...speechCapabilities, ...videoCapabilities];
-const executableOperations = executableCapabilities.map(c => c.id);
+const executableOperations = [...executableCapabilities.map(c => c.id), ...languageOperations];
 import type { WebSocket } from "ws";
 
 export interface Options {
@@ -98,7 +100,7 @@ export async function createApp(options: Options) {
     if (socket?.readyState !== 1) return;
     socket.send(
       JSON.stringify({
-        protocolVersion: "2.0",
+        protocolVersion: "3.0",
         messageId: id(),
         type,
         payload,
@@ -115,6 +117,7 @@ export async function createApp(options: Options) {
     return job;
   };
   const mediaQueue = new ServerMediaQueue(store, assets, saveJob, options.mediaExecutable);
+  const language = new LanguageService(store, assets, saveJob);
   const pendingTransfers = new Set<Promise<any>>();
   const uploads = new Set<string>(), downloads = new Set<string>();
   const transport = new WorkerTransport(options.root, (workerId, lastError) => {
@@ -180,7 +183,7 @@ export async function createApp(options: Options) {
   app.get("/api/v1/system", async () => ({
     name: "Zhilume Server",
     version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version,
-    protocolVersion: "2.0",
+    protocolVersion: "3.0",
     authentication: true,
   }));
   const loginAttempts = new Map<string, { count: number; until: number }>();
@@ -451,7 +454,7 @@ export async function createApp(options: Options) {
   });
   app.get("/api/v1/capabilities", async (req) => {
     owner(req);
-    return executableCapabilities.map((c) => ({
+    return [...languageOperations.map(id => ({id, name: id === "text.generate.v1" ? "文本生成" : "提示词优化", executor: "api", ready: language.models().some(m => m.ready)})), ...executableCapabilities.map((c) => ({
       ...c,
       executor: c.id.startsWith('media.') ? 'server' : 'worker',
       ready: c.id.startsWith('media.') ? mediaQueue.ready : store
@@ -463,11 +466,11 @@ export async function createApp(options: Options) {
             Date.now() - w.lastHeartbeat < 40000 &&
             w.capabilities.includes(c.id),
         ),
-    }));
+    }))];
   });
-  app.get("/api/v1/video-models", async (req) => { owner(req); return videoAvailability(store.all("worker")); });
-  app.get("/api/v1/speech-models", async (req) => { owner(req); return speechAvailability(store.all("worker")); });
-  app.get("/api/v1/image-models", async (req) => { owner(req); return modelAvailability(store.all("worker")); });
+  app.get("/api/v1/video-models", async (req) => { owner(req); return videoAvailability(knownWorkers()); });
+  app.get("/api/v1/speech-models", async (req) => { owner(req); return speechAvailability(knownWorkers()); });
+  app.get("/api/v1/image-models", async (req) => { owner(req); return modelAvailability(knownWorkers()); });
   app.get("/api/v1/jobs", async (req: any) => {
     owner(req);
     return store
@@ -482,102 +485,99 @@ export async function createApp(options: Options) {
     owner(req);
     return publicJob(requireValue(store.get("job", req.params.id)));
   });
-  app.post("/api/v1/jobs", async (req: any, reply) => {
-    owner(req);
-    const b = req.body;
+  function knownWorkers() {
+    return [...store.all("worker"), { id: 'registry', name: '已登记规格', connected: false, imageProfiles: store.all('execution-spec').filter(s => s.kind === 'image').map(s => s.spec), speechProfiles: store.all('execution-spec').filter(s => s.kind === 'speech').map(s => s.spec), videoProfiles: store.all('execution-spec').filter(s => s.kind === 'video').map(s => s.spec) }];
+  }
+  function normalize(operation: string, input: any, lookup = (assetId: string) => store.get('asset', assetId)): any {
+    if (!executableOperations.includes(operation)) throw new AppError('unknown_capability', '不支持此执行能力');
+    return languageOperations.includes(operation) ? language.validate(operation, input, lookup)
+      : isVideoOperation(operation) ? validateVideoInput(input, knownWorkers(), lookup)
+      : isSpeechOperation(operation) ? validateSpeechInput(input, knownWorkers(), lookup)
+      : isImageOperation(operation) ? validateImageInput(operation, input, knownWorkers(), lookup)
+      : operation.startsWith('media.') ? validateMediaInput(operation, input, requireValue(lookup(input?.assetId), '输入素材不存在'))
+      : operation === operations[0] ? { text: text(input?.text) }
+      : { assetId: requireValue(lookup(input?.assetId), '输入素材不存在').id };
+  }
+  function prepareJob(b: any, input: any, extra: any = {}) {
     const project = getProject(b.projectId, true);
-    const requestId = text(b.requestId, 100);
-    if (!executableOperations.includes(b.operation))
-      throw new AppError("unknown_capability", "不支持此执行能力");
-    const existing = store.all("job").find((j) => j.requestId === requestId);
-    const fingerprint = digest(JSON.stringify(b));
-    if (existing) {
-      if (existing.fingerprint !== fingerprint)
-        throw new AppError(
-          "idempotency_conflict",
-          "相同请求标识不能用于不同任务",
-          409,
-        );
-      return publicJob(existing);
-    }
-    if (
-      b.nodeId &&
-      store
-        .all("job")
-        .some(
-          (j) =>
-            j.nodeId === b.nodeId &&
-            j.projectId === project.id &&
-            !terminal.has(j.status),
-        )
-    )
-      throw new AppError("node_busy", "此节点已有未结束任务", 409);
-    const node = b.nodeId
-      ? store
-          .get("canvas", project.id)
-          ?.nodes.find((n: any) => n.id === b.nodeId)
-      : null;
-    if (b.nodeId && !node)
-      throw new AppError("node_missing", "请先保存画布节点");
-    const input = isVideoOperation(b.operation)
-      ? validateVideoInput(b.input, store.all("worker"), id => store.get("asset", id))
-      : isSpeechOperation(b.operation)
-      ? validateSpeechInput(b.input, store.all("worker"), id => store.get("asset", id))
-      : isImageOperation(b.operation)
-      ? validateImageInput(b.operation, b.input, store.all("worker"), id => store.get("asset", id))
-      : b.operation.startsWith("media.")
-      ? validateMediaInput(b.operation, b.input, requireValue(store.get("asset", b.input?.assetId), "输入素材不存在"))
-      : b.operation === operations[0]
-        ? { text: text(b.input?.text) }
-        : {
-            assetId: requireValue(
-              store.get("asset", b.input?.assetId),
-              "输入素材不存在",
-            ).id,
-          };
-    if (
-      "assetId" in input &&
-      !["image", "video", "audio"].includes(
-        store.get("asset", input.assetId)!.kind,
-      )
-    )
-      throw new AppError("invalid_input", "素材复制只支持图片、视频与音频");
-    const job = {
-      id: id(),
-      requestId,
-      fingerprint,
-      projectId: project.id,
-      nodeId: b.nodeId || null,
-      operation: b.operation,
-      executor: b.operation.startsWith('media.') ? 'server' : 'worker',
-      input,
-      status: "queued",
-      stage: b.operation.startsWith('media.') ? '等待 Server 媒体队列' : '等待执行端',
-      progress: null,
-      simulation: b.operation.startsWith("mock."),
-      attemptId: id(),
-      leaseId: null,
-      workerId: null,
-      sequence: 0,
-      attempts: [],
-      createdAt: now(),
-      updatedAt: now(),
-      sourceRevision: b.sourceRevision,
-      outputAssetId: null,
-      error: null,
-      errorCode: null,
-    };
-    if (job.executor === 'server' && !mediaQueue.ready) throw new AppError('ffmpeg_unavailable', 'Server 内置 FFmpeg 不可用，请检查安装包', 503);
-    saveJob(job);
-    schedule();
-    return reply.code(201).send(publicJob(job));
+    if (b.nodeId && !store.get('canvas', project.id)?.nodes.some((n: any) => n.id === b.nodeId)) throw new AppError('node_missing', '请先保存画布节点');
+    if (b.nodeId && b.operation !== 'prompt.optimize.v1' && store.all('job').some(j => j.nodeId === b.nodeId && j.projectId === project.id && j.operation !== 'prompt.optimize.v1' && !terminal.has(j.status))) throw new AppError('node_busy', '此节点已有未结束任务', 409);
+    const targetWorkerId = b.targetWorkerId ? text(b.targetWorkerId, 100) : null;
+    if (targetWorkerId && (!store.get('worker', targetWorkerId) || languageOperations.includes(b.operation) || b.operation.startsWith('media.'))) throw new AppError('invalid_target', '此任务不能指定该执行端');
+    const executor = languageOperations.includes(b.operation) ? 'api' : b.operation.startsWith('media.') ? 'server' : 'worker';
+    if (executor === 'server' && !mediaQueue.ready) throw new AppError('ffmpeg_unavailable', 'Server 内置 FFmpeg 不可用', 503);
+    const assetIds = [...new Set([...(input.referenceAssetIds || []), ...(input.assetId ? [input.assetId] : [])])];
+    return { id: id(), requestId: text(b.requestId, 100), fingerprint: taskFingerprint(b), projectId: project.id, nodeId: b.nodeId || null,
+      operation: b.operation, executor, targetWorkerId, input: structuredClone(input), frozenAssets: assetIds.map(a => store.get('asset', a)).filter(Boolean).map(a => ({ id: a.id, sha256: a.sha256, size: a.size })),
+      status: 'queued', stage: '等待分配', waitReason: 'resource_busy', progress: null, simulation: b.operation.startsWith('mock.'), attemptId: id(), leaseId: null, workerId: null, sequence: 0, attempts: [], createdAt: now(), updatedAt: now(), sourceRevision: store.get('canvas', project.id)?.revision,
+      outputAssetId: null, error: null, errorCode: null, ...extra };
+  }
+  app.get('/api/v1/language/providers', async req => { owner(req); return language.providers(); });
+  app.post('/api/v1/language/providers', async (req: any) => { owner(req); return language.configure(req.body); });
+  app.get('/api/v1/language/models', async req => { owner(req); return language.models(); });
+  app.get('/api/v1/models', async req => { owner(req); return { image: modelAvailability(knownWorkers()), speech: speechAvailability(knownWorkers()), video: videoAvailability(knownWorkers()), language: language.models() }; });
+  app.post('/api/v1/jobs', async (req: any, reply) => {
+    owner(req); const b = req.body; text(b.requestId, 100);
+    const previous = store.all('job').find(j => j.requestId === b.requestId);
+    if (previous) { if (previous.fingerprint !== taskFingerprint(b)) throw new AppError('idempotency_conflict', '相同请求标识不能用于不同任务', 409); return publicJob(previous); }
+    const job = prepareJob(b, normalize(b.operation, b.input)); saveJob(job); schedule(); return reply.code(201).send(publicJob(store.get('job', job.id)));
   });
+  app.post('/api/v1/job-groups', async (req: any, reply) => {
+    owner(req); const b = req.body, requestId = text(b.requestId, 100), fingerprint = taskFingerprint(b);
+    const prior = store.all('job-group').find(g => g.requestId === requestId);
+    if (prior) { if (prior.fingerprint !== fingerprint) throw new AppError('idempotency_conflict', '批次请求内容已变更', 409); return { ...prior, jobs: prior.jobIds.map((j: string) => publicJob(store.get('job', j))) }; }
+    getProject(b.projectId, true); validateGraph(b.tasks, b.mode);
+    const groupId = id(), taskMap = new Map<string, any>(b.tasks.map((t: any) => [t.key, t]));
+    const virtual = new Map<string, any>();
+    function outputKind(task: any): string {
+      if (task.operation === 'mock.media.copy.v1') { const binding = task.bindings?.find((b: any) => b.target === 'assetId'); return binding ? outputKind(taskMap.get(binding.from)) : requireValue(store.get('asset', task.input?.assetId), '输入素材不存在').kind; }
+      return task.operation.startsWith('image.') ? 'image' : task.operation.startsWith('audio.') || task.operation === 'media.audio.extract.v1' ? 'audio' : task.operation.startsWith('video.') || task.operation === 'media.video.trim.v1' ? 'video' : 'text';
+    }
+    const jobs = b.tasks.map((t: any) => {
+      const validationInput = structuredClone(t.input);
+      for (const bind of t.bindings || []) {
+        const kind = outputKind(taskMap.get(bind.from));
+        if (['text', 'prompt'].includes(bind.target)) { if (kind !== 'text') throw new AppError('binding_kind', '文字输入需要上游文本'); bindInput(validationInput, bind.target, '待上游文本'); }
+        else { const aid = 'upstream-' + bind.from; virtual.set(aid, { id: aid, kind, staged: false, size: 1 }); bindInput(validationInput, bind.target, aid); }
+      }
+      const normalized = normalize(t.operation, validationInput, aid => virtual.get(aid) || store.get('asset', aid));
+      // Freeze the normalized specification and all unbound fields; only declared slots may change.
+      const frozenTemplate = structuredClone(normalized);
+      for (const bind of t.bindings || []) bindInput(frozenTemplate, bind.target, '');
+      return prepareJob({ ...t, projectId: b.projectId, requestId: groupId + ':' + t.key }, normalized, {
+        groupId, key: t.key, inputTemplate: frozenTemplate, bindings: t.bindings || [], status: t.bindings?.length ? 'waiting_upstream' : 'queued', stage: t.bindings?.length ? '等待上游归档' : '等待分配', waitReason: t.bindings?.length ? 'upstream_pending' : 'resource_busy',
+      });
+    });
+    const nodeIds = jobs.filter((j: any) => j.nodeId).map((j: any) => j.nodeId);
+    if (new Set(nodeIds).size !== nodeIds.length) throw new AppError('node_busy', '同批次不能重复提交同一节点');
+    const ids = new Map(jobs.map((j: any) => [j.key, j.id]));
+    for (const j of jobs) j.bindings = j.bindings.map((x: any) => ({ ...x, jobId: ids.get(x.from) }));
+    const group = { id: groupId, requestId, fingerprint, projectId: b.projectId, mode: b.mode, jobIds: jobs.map((j: any) => j.id), createdAt: now() };
+    store.atomic(() => { for (const j of jobs) store.put('job', j); store.put('job-group', group); });
+    emit('job.changed'); schedule(); return reply.code(201).send({ ...group, jobs: jobs.map((j: any) => publicJob(store.get('job', j.id))) });
+  });
+  function resolveDependencies() {
+    for (const j of store.all('job').reverse().filter(j => j.status === 'waiting_upstream')) {
+      const upstream = j.bindings.map((b: any) => store.get('job', b.jobId));
+      if (upstream.some((u: any) => !u || (terminal.has(u.status) && u.status !== 'succeeded'))) {
+        saveJob(Object.assign(j, { status: 'blocked', waitReason: 'upstream_failed', stage: '上游失败或取消', error: '重试上游成功后可重试本任务', errorCode: 'upstream_failed' })); continue;
+      }
+      if (!upstream.every((u: any) => u.status === 'succeeded' && u.outputAssetId && store.get('asset', u.outputAssetId)?.staged === false)) continue;
+      try {
+        const input = structuredClone(j.inputTemplate);
+        for (const binding of j.bindings) { const u = store.get('job', binding.jobId), a = store.get('asset', u.outputAssetId); bindInput(input, binding.target, ['text', 'prompt'].includes(binding.target) ? readFileSync(assets.path(a), 'utf8') : a.id); }
+        j.input = normalize(j.operation, input);
+        j.frozenAssets = [...new Set([...(j.input.referenceAssetIds || []), ...(j.input.assetId ? [j.input.assetId] : [])])].map((aid: any) => { const a = store.get('asset', aid); return { id: a.id, size: a.size, sha256: a.sha256 }; });
+        saveJob(Object.assign(j, { status: 'queued', waitReason: 'resource_busy', stage: '等待分配' }));
+      } catch (e) { saveJob(Object.assign(j, { status: 'failed', stage: '上游结果不符合输入限制', error: (e as Error).message, errorCode: 'dependency_input_invalid' })); }
+    }
+  }
   app.post("/api/v1/jobs/:id/cancel", async (req: any) => {
     owner(req);
     const job = requireValue(store.get("job", req.params.id));
     if (terminal.has(job.status))
       throw new AppError("job_terminal", "任务已经结束", 409);
-    if (job.status === "queued") {
+    if (["queued", "waiting_upstream"].includes(job.status)) {
       job.status = "cancelled";
       job.stage = "已取消";
     } else {
@@ -585,6 +585,7 @@ export async function createApp(options: Options) {
       job.stage = "等待停止确认";
       send(job.workerId, "task.cancel", {}, job);
       if (job.executor === 'server') mediaQueue.cancel(job.id);
+      if (job.executor === 'api') language.cancel(job.id);
     }
     return publicJob(saveJob(job));
   });
@@ -592,11 +593,9 @@ export async function createApp(options: Options) {
     owner(req);
     const j = requireValue(store.get("job", req.params.id));
     getProject(j.projectId, true);
-    if (!["failed", "interrupted"].includes(j.status))
+    if (!["failed", "interrupted", "blocked", "cancelled"].includes(j.status))
       throw new AppError("retry_not_allowed", "仅失败或中断任务可以重试", 409);
-    if (isVideoOperation(j.operation)) validateVideoInput(j.input, store.all("worker"), id => store.get("asset", id));
-    if (isSpeechOperation(j.operation)) validateSpeechInput(j.input, store.all("worker"), id => store.get("asset", id));
-    if (isImageOperation(j.operation)) validateImageInput(j.operation, j.input, store.all("worker"), id => store.get("asset", id));
+    if (!j.bindings?.length) normalize(j.operation, j.input);
     j.attempts.push({
       attemptId: j.attemptId,
       status: j.status,
@@ -605,7 +604,7 @@ export async function createApp(options: Options) {
       updatedAt: j.updatedAt,
     });
     Object.assign(j, {
-      status: "queued",
+      status: j.bindings?.length ? "waiting_upstream" : "queued",
       stage: j.executor === 'server' ? '等待 Server 媒体队列' : '等待执行端',
       attemptId: id(),
       leaseId: null,
@@ -739,7 +738,9 @@ export async function createApp(options: Options) {
   }
   function schedule() {
     if (closed) return;
+    resolveDependencies();
     mediaQueue.pump();
+    language.pump();
     for (const job of store.all("job"))
       if (
         job.executor === 'worker' && ["assigned", "running", "cancel_requested"].includes(job.status) &&
@@ -762,35 +763,20 @@ export async function createApp(options: Options) {
       .all("job")
       .filter((j) => j.status === "queued" && j.executor === 'worker')
       .reverse()) {
-      const worker = store
-        .all("worker")
-        .find(
-          (w) =>
-            w.connected &&
-            !w.disabled &&
-            !w.draining &&
-            peers.get(w.id)?.readyState === 1 &&
-            Date.now() - w.lastHeartbeat < 40000 &&
-            w.capabilities.includes(job.operation) &&
-            supportsImageJob(w, job) && supportsSpeechJob(w, job) && supportsVideoJob(w, job) &&
-            !store
-              .all("job")
-              .some(
-                (j) =>
-                  j.workerId === w.id &&
-                  !terminal.has(j.status) &&
-                  j.status !== "queued",
-              ),
-        );
-      if (!worker) continue;
+      const decision = route(job, store.all('worker'), store.all('job'), wid => peers.get(wid)?.readyState === 1);
+      const worker = decision.worker;
+      if (!worker) { if (job.waitReason !== decision.reason) saveJob(Object.assign(job, { waitReason: decision.reason, stage: decision.stage })); continue; }
       Object.assign(job, {
         workerId: worker.id,
+        resourceIds: worker.deployment.resourceIds,
+        waitReason: null,
         status: "assigned",
         stage: "准备执行",
         leaseId: id(),
         leaseExpires: Date.now() + leaseMs,
       });
       saveJob(job);
+      store.put('worker', { ...worker, activeAttempts: [job.attemptId] });
       const input = job.input.assetId
         ? {
             ...job.input,
@@ -839,15 +825,20 @@ export async function createApp(options: Options) {
             msg.payload.capabilities.some((v: any) => typeof v !== "string")
           )
             throw new AppError("invalid_capabilities", "能力声明无效");
-          const imageProfiles = validateImageProfiles(msg.payload.imageProfiles);
-          const speechProfiles = validateSpeechProfiles(msg.payload.speechProfiles);
-          const videoProfiles = validateVideoProfiles(msg.payload.videoProfiles);
+          const deployment = validateDeployment(msg.payload.deployment);
+          const specs = msg.payload.executionSpecs;
+          if (!Array.isArray(specs) || specs.length > 40 || specs.some((s: any) => !['image', 'speech', 'video'].includes(s.kind))) throw new AppError('invalid_specs', '执行规格声明无效');
+          const imageProfiles = validateImageProfiles(specs.filter((s: any) => s.kind === 'image').map((s: any) => s.spec));
+          const speechProfiles = validateSpeechProfiles(specs.filter((s: any) => s.kind === 'speech').map((s: any) => s.spec));
+          const videoProfiles = validateVideoProfiles(specs.filter((s: any) => s.kind === 'video').map((s: any) => s.spec));
+          for (const [kind, profiles] of [['image', imageProfiles], ['speech', speechProfiles], ['video', videoProfiles]] as const)
+            for (const spec of profiles) store.put('execution-spec', { id: spec.profileId, kind, spec });
           welcomed = true;
           clearTimeout(handshakeTimeout);
           Object.assign(w, {
             connected: true,
             lastHeartbeat: Date.now(),
-            imageProfiles, speechProfiles, videoProfiles,
+            imageProfiles, speechProfiles, videoProfiles, deployment, activeAttempts: msg.payload.activeAttempts,
             capabilities: msg.payload.capabilities.filter((s: string) =>
               !s.startsWith('media.') && executableOperations.includes(s) && (!isImageOperation(s) || imageProfiles.some(p => p.operations.includes(s))) && (!isSpeechOperation(s) || speechProfiles.length > 0) && (!isVideoOperation(s) || videoProfiles.length > 0),
             ),
@@ -893,7 +884,7 @@ export async function createApp(options: Options) {
         }
         if (!welcomed) throw new AppError("hello_required", "请先握手");
         if (msg.type === "heartbeat") {
-          Object.assign(w, { connected: true, lastHeartbeat: Date.now() });
+          Object.assign(w, { connected: true, lastHeartbeat: Date.now(), activeAttempts: msg.payload.activeAttempts || [] });
           store.put("worker", w);
           for (const j of store
             .all("job")
@@ -1010,7 +1001,7 @@ export async function createApp(options: Options) {
       } catch (error: any) {
         if (socket.readyState === 1) socket.send(
           JSON.stringify({
-            protocolVersion: "2.0",
+            protocolVersion: "3.0",
             messageId: id(),
             type: "error",
             payload: {
@@ -1045,6 +1036,7 @@ export async function createApp(options: Options) {
     clearInterval(timer);
     transport.close();
     await mediaQueue.close();
+    await language.close();
     for (const s of peers.values()) s.terminate();
     await Promise.allSettled([...pendingTransfers]);
     for (const s of events) s.close();

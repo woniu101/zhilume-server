@@ -1,20 +1,22 @@
-# 协议开发基线（信封 2.0 / 契约快照 2.0.0）
+# 协议开发基线（信封 3.0 / 契约快照 3.0.0）
 
 当前实现覆盖 GPU 图片执行协议、CPU 媒体处理及显式模拟闭环；上海二 A GPU 样本验收见云端报告。初版直接修改契约，不为历史开发版保留兼容分支。能力目录由 Server 发布、Worker 内含带 SHA-256 的快照。
+
+当前完整的规格、依赖、API 队列和界面规范见 [模型与调度基线](model-and-scheduling.md)。GPU 旧样本不替代本次资源释放机制的真实验收。新增 `/models`、`/job-groups`、`/language/providers`、`/language/models`；字段见该基线。
 
 ## Worker 接入
 
 1. Worker 启动受鉴权接入服务，默认 127.0.0.1:4320；本机 --show-token 显示独立接入密钥。无需 Server 地址。
 2. 管理员 POST /api/v1/workers/probe 测试 {address,credential}；POST /api/v1/workers 保存，可附 name。GET /workers 不返回密钥。
-3. Server 主动请求 Worker /api/v1/system，校验 workerId 和协议 2.0；主动建立 /api/v1/connect WebSocket，Authorization Bearer 与 X-Zhilume-Server-Id 通过请求头传递。
-4. Worker 首次鉴权连接绑定 Server 身份；其他 Server 拒绝接入。hello 包含 workerId、capabilities、imageProfiles、speechProfiles、activeAttempts；Server welcome 后允许接单。
+3. Server 主动请求 Worker /api/v1/system，校验 workerId 和协议 3.0；主动建立 /api/v1/connect WebSocket，Authorization Bearer 与 X-Zhilume-Server-Id 通过请求头传递。
+4. Worker 首次鉴权连接绑定 Server 身份；其他 Server 拒绝接入。hello 包含 workerId、capabilities、executionSpecs、deployment、activeAttempts；Server welcome 后允许接单。
 5. Server 管理持久连接及退避重连；Worker 10 秒心跳，默认 90 秒租约。停用断开连接；排空不接新任务。
 
 ## 一次任务
 
 `task.assign` → `task.accepted` → Server 上传输入 → `task.inputs_ready` → `task.progress` → `task.result_ready` → Server 下载/校验/归档 → `task.commit_ack`。
 
-- 信封 protocolVersion=2.0；任务消息包含 jobId、attemptId、leaseId，进度有递增 sequence。
+- 信封 protocolVersion=3.0；任务消息包含 jobId、attemptId、leaseId，进度有递增 sequence。
 - 输入元信息包含 id、filename、size、sha256，图片参考保持声明顺序；Worker 不访问 Server 的素材 URL。
 - Server PUT Worker `/api/v1/attempts/{attemptId}/inputs/{assetId}` 流式上传，鉴权头加 X-Lease-Id。Worker 校验任务归属、有效租约、大小与哈希后原子改名；完整文件重复上传直接确认。
 - result_ready.payload 为 `{filename,size,sha256}`；Server GET 同一 Worker `/api/v1/attempts/{attemptId}/output`，流式导入并核对声明和能力契约。结果只归档到当前有效尝试。
@@ -24,7 +26,7 @@
 
 ## 状态与恢复
 
-任务状态：queued、assigned、running、cancel_requested、succeeded、failed、cancelled、interrupted。
+任务状态：queued、waiting_upstream、assigned、running、cancel_requested、succeeded、failed、blocked、cancelled、interrupted。
 
 取消发送 task.cancel，Worker 停止后回报 task.cancelled。未确认取消前不宣称已取消。失联过租约后为 interrupted。重试保留 Job ID，创建新 attempt/lease，历史 attempts 可查看。迟到的旧尝试不得写入当前结果。Worker 重启时 hello 不声明无法恢复的旧执行。
 
@@ -59,9 +61,9 @@ viewport 的 zoom 限制 0.15–2.5。Folder PATCH 校验所属项目与祖先�
 
 ## 图片操作与执行配置
 
-传输协议 2.0.0、操作目录 1.4.0。Qwen Image 2512 仅支持 `image.generate.v1`；2.1 另支持 `image.edit.v1` 与 `image.reference.v1`。模型状态仍为 `awaiting_gpu_validation`，这与在线可试运行状态相互独立。
+传输协议 3.0.0、操作目录 1.4.0。Qwen Image 2512 仅支持 `image.generate.v1`；2.1 另支持 `image.edit.v1` 与 `image.reference.v1`。模型状态仍为 `awaiting_gpu_validation`，这与在线可试运行状态相互独立。
 
-hello.imageProfiles 为公开配置数组：modelId、profileId（64 位 SHA-256）、workflowRevision、operations、maxReferences、formats、minSize=256、maxSize<=2048、sizeStep=32、referenceResolution、defaultSteps、maxSteps=100、validation=unverified。Worker 仅在明确启用并通过只读节点/模型检查后发布。Server 按操作、模型、配置指纹与工作流版本共同调度，不能只按 image.generate 匹配。
+hello.executionSpecs 中 kind=image 的 spec 为公开执行规格（含 identity.revision/quantization/artifacts）：modelId、profileId（64 位 SHA-256）、workflowRevision、operations、maxReferences、formats、minSize=256、maxSize<=2048、sizeStep=32、referenceResolution、defaultSteps、maxSteps=100、validation=unverified。Worker 仅在明确启用并通过只读节点/模型检查后发布。Server 按操作、模型、配置指纹与工作流版本共同调度，不能只按 image.generate 匹配。
 
 图片 Job 输入：
 
@@ -83,7 +85,7 @@ hello.imageProfiles 为公开配置数组：modelId、profileId（64 位 SHA-256
 - 编辑恰好 1 张；多参考 2–maxReferences 张，不接受重复 ID。每张为已归档图片且不超过 64 MB。
 - 编辑/参考禁止同时指定 width/height，referenceResolution 由 Server 从配置补齐。输出比例跟随第一张图，Qwen 工作流取整对齐尺寸。
 - Server 派发时附 `referenceAssets` 元信息数组，顺序与 referenceAssetIds 一致。Server 逐文件上传，Worker 校验大小/SHA-256；上传接口只允许当前任务输入 ID。
-- profile 离线/变更时拒绝新提交和重试；已排队任务不会自动改投其他模型或配置。
+- 已登记 profile 离线时允许提交和重试并等待；未知规格拒绝提交。已排队任务不会自动改投其他模型或配置。
 - 输出为单张 PNG，Server 从 Job 生成 provenance，包含有序来源、模型、指纹、工作流版本、种子和参数。结果新建 Asset；原文件不改写。
 - ComfyUI 采样百分比尚未接入时，progress=null，展示真实阶段，不能伪造百分比。
 - 取消只针对本次 ComfyUI prompt UUID。无法确认停止时回报 failed 并撤下 Worker 图片配置，不可显示为已取消。提交响应丢失不自动重发。
@@ -119,7 +121,7 @@ GET /image-models 的每个模型返回 referenceLimits.maximum（2512 为 0、2
 草稿与可执行请求分开校验：上游画布可能超过模型引用限制，generationDraft.refs 允许最多 1000 个唯一 ID（与画布节点数上限一致），保留超限引用供移除；UI 明确阻止超限任务，不能因为此草稿导致整个项目无法保存。普通添加入口不允许超出当前能力数量。任务的操作、输入顺序、尺寸/透明通道校验和幂等请求身份不变；本轮不新增任务状态。
 
 
-## 语音生成（目录 1.5.0，wire protocol 仍为 2.0）
+## 语音生成（目录 1.5.0，wire protocol 3.0）
 
 GET `/speech-models` 返回模型边界和在线 profiles。hello.speechProfiles 包含 modelId、64 位 profileId、workflowRevision、upstreamRevision、maxTextCharacters、languages、emotionModes、validation=unverified。指纹包含部署路径/配置和工作流、上游提交版本，不是权重内容哈希。仅启用并通过文件预检后声明 audio.speech.v1；Server 按完全相同的模型/配置/工作流调度。
 
@@ -130,7 +132,7 @@ data.speechDraft 保存未完成语音表单与可选 request={id,fingerprint}�
 任务状态沿用 queued/assigned/running/cancel_requested/succeeded/failed/cancelled/interrupted，executor=worker。进度阶段为准备音色与情绪参考、加载 IndexTTS 并合成语音、校验语音结果，progress=null；结果经校验与归档才成功。Worker 取消/超时先结束所持有子进程再回报；推理失败为 failed，详细原因保留在本地 attempts/<attemptId>/speech.log。来源素材和规范化参数归档至 provenance。普通视频截取/抽音轨仍走 Studio/Server CPU 模块。
 
 
-## 视频生成（目录 1.6.0，wire protocol 2.0）
+## 视频生成（目录 1.6.0，wire protocol 3.0）
 
 GET `/video-models` 返回 FL2VA、Ref2VA 模型目录及在线 profiles。hello.videoProfiles 为 `{modelId,profileId,workflowRevision,modes,sizes:[[w,h]],frames:[124,...],fps:24,referenceLimits:{image,video,audio},defaultSteps,maxSteps:50,validation:unverified}`。只有显式启用且加载器模型/必需节点检查通过才声明 video.generate.v1；该检查不证明推理成功。
 
@@ -139,3 +141,8 @@ POST `/jobs` operation=video.generate.v1，input 为 `{modelId,profileId,workflo
 输出尺寸来自 profile，帧数 124–345、17k+5；参考数量不超过 profile 与总数 12，视频/音频各累计不超过 15 秒。图片上限 64 MiB，其余 256 MiB；不允许 staged 素材。草稿 data.videoDraft 保留首尾帧 ID、参考列表、参数、模式及可选 request={id,fingerprint}，允许空内容、离线 profile、最多 1000 个待调整引用；真正提交严格限制 12。复制节点清除 request。
 
 任务状态复用 queued/assigned/running/cancel_requested/succeeded/failed/cancelled/interrupted，executor=worker。阶段为准备 H3 参考片段、传输参考素材到 ComfyUI、模型执行中、校验视频与音轨，progress=null。取消等待 FFmpeg 退出或 ComfyUI 对应 prompt 停止；无法确认时 failed 并撤下同端点图片/视频能力。输出必须为 H.264 MP4、准确尺寸/帧数/24 FPS，includeAudio=true 时含 32kHz 立体声；归档前校验文件与 SHA-256，成功才回 commit_ack。provenance 保留去重 sourceAssetIds 与完整规范化参数。
+
+
+## Worker 本机管理 API
+
+FastAPI 同端口提供 `/management` 静态页面及 `/management/api/*`。所有管理 API 单独校验管理 Bearer，任务接入凭证无权访问。GET overview/access/diagnostics/operations；PUT executors/:kind/config；POST executors/:kind/check|enable|disable（停用 policy=wait|cancel）；POST access（configure/unbind/rotate）；POST install（先计划，execute=true 才安装）。长操作返回 operationId，通过 operations 查询。任务 API 仍要求调度凭证及绑定/lease，管理凭证不能替代任务凭证。具体部署及共用 CLI 见 Worker deploy/management.md。

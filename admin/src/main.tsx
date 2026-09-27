@@ -1,3 +1,4 @@
+import { LanguageProviders } from './LanguageProviders';
 import metadata from "../../package.json";
 import catalog from "../../contracts/operation-catalog.json";
 import { useEffect, useState } from "react";
@@ -90,6 +91,7 @@ function App() {
   const navigation = [
     ["overview", "总览", LayoutDashboard],
     ["workers", "执行端", Server],
+    ["language", "语言模型", Settings],
     ["jobs", "任务队列", History],
     ["assets", "素材存储", HardDrive],
     ["settings", "服务设置", Settings],
@@ -195,7 +197,7 @@ function App() {
                     {page === "overview"
                       ? "管理算力与创作任务，让想法持续发生。"
                       : page === "workers"
-                        ? "执行端主动连接 Server，可部署在本地主机或云 GPU。"
+                        ? "Server 主动连接执行端，无需 Server 公网入口。"
                         : page === "jobs"
                           ? "查看真实任务状态，处理失败、取消和重试。"
                           : page === "assets"
@@ -345,6 +347,7 @@ function App() {
                   )}
                 </section>
               )}
+              {page === "language" && <LanguageProviders />}
               {page === "settings" && (
                 <section className="admin-card settings-card">
                   <h2>服务信息</h2>
