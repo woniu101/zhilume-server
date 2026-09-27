@@ -19,6 +19,8 @@
 
 hello 增加 `executionSpecs.kind=language`。规格包含 `backend=llama.cpp`、`workflowRevision=language.llamacpp.v1`、modelId、operations、capabilities、outputFormats、maxImages、maxInputCharacters、maxOutputTokens、contextSize、identity、profileId。首版仅纯文本 TXT。
 
+`reasoningMode=off|auto` 也进入规格摘要；创作默认 off，通过 llama.cpp 模板参数关闭思考。输出触及 Token 上限仍按失败处理，不把截断文本归档为成功。共享库程序在部署配置 `runtimeFiles` 指定本机文件，公开 identity 使用对应 `runtime.*` SHA256；只有摘要参与跨 Worker 等价匹配。
+
 Worker 核心不安装推理依赖。语言执行器通过独立受管进程使用已有程序与 GGUF。它与图片/语音/视频共用 GPU 队列、物理资源互斥及取消/隔离机制。不同路径的同规格聚合，版本、量化、二进制和权重摘要、能力限制不同则分开；高级选项可指定 Worker。
 
 `GET /api/v1/language/models` 返回统一可选项，带 `executor`；Worker 项另带 workers、readyCount、endpointCount、identity。离线规格保留，显示等待原因。Worker 生成结果经文件传输、内容校验后归档；Server 设置 outputText 与 outputAssetId，供依赖和 Studio 审阅使用。

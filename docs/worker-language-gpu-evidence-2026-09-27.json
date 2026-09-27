@@ -1,0 +1,239 @@
+{
+  "date": "2026-09-27",
+  "region": "cn-sh2 / cn-sh2-01",
+  "versions": {
+    "server": "0.11.1",
+    "worker": "0.12.1"
+  },
+  "modelSource": "CompShare public Qwen/Qwen3.5-9B Safetensors, cloud conversion to BF16 GGUF",
+  "modelDownloaded": false,
+  "llamaRelease": "b11218",
+  "binaryArchiveSha256": "df142d4678f134bf0b4b57a13327ae429efc9b3e0dbc30f293d426d70509f13b",
+  "workerWheelSha256": "e444e5881c8631df6f159326e19f48422b8aba102f2f0ccd3c79d3d1c79b8003",
+  "spec": {
+    "modelId": "qwen3.5-9b",
+    "backend": "llama.cpp",
+    "profileId": "f42cbb45e4a0dada2d4b9e9bfb42c07002c5ebef6e37dc431b2267c0a8bec79b",
+    "workflowRevision": "language.llamacpp.v1",
+    "identity": {
+      "revision": "qwen3.5-9b-llama-b11218",
+      "quantization": "BF16",
+      "artifacts": {
+        "model": "sha256:3aec5d0ee173f4d098d7b96ddd98a1ece4fab9d46fa0ab9fd2b9a3175c49196c",
+        "binary": "sha256:2091b2018ba3f58965dd987da742ca2854c2c8bbaf47e96b3b3c0644855a74d9",
+        "converter": "revision:llama.cpp-b11218",
+        "runtime.libggml-cuda.so": "sha256:20e3eefb0d917d34f9809b77520c86b34ae50c4978a045b556929648f057d60e",
+        "runtime.libllama-common.so.0.5.0": "sha256:98b604ca509ecd8e839d6e452de6a25f5e67765b450f2fad953836326ca56715",
+        "runtime.libggml-cpu-skylakex.so": "sha256:c5dc878da607474d338966cf71ba37ceb7b2937d41ed44661fd47b1e75877ecc",
+        "runtime.libggml-cpu-ivybridge.so": "sha256:b3cbb7370a6ffa333ad3b2c93c4e79c7076056abb14b7fa975282d143bf88d2d",
+        "runtime.libggml-cpu-cannonlake.so": "sha256:404cad00eb931dfa99eb1e302a081e014a0f32520b56a5f1c3c68076f9c01964",
+        "runtime.libggml-cpu-icelake.so": "sha256:d6f4743a007fb753251f525c14a90f003532b4db8879b569accce0bf119f7087",
+        "runtime.libggml-base.so.0.25.3": "sha256:a0962099979258cc8c64a9eebb15ae0ffa1d164dce6569c268cef60cdff399f0",
+        "runtime.libggml-cpu-haswell.so": "sha256:ebc6815a84d902d6b149a69ae6cb0e1bce8bcecf388dd96ad121ac05321017cb",
+        "runtime.libllama-batched-bench-impl.so": "sha256:c27d1038e73add8d44a6b7e2b462aeb77665b1f02157c368f890671ed0b03460",
+        "runtime.libllama-quantize-impl.so": "sha256:d410a2ca89fd4cc69727afe5e50a49e7bcb708bc530f5041bb2efaa430e264c6",
+        "runtime.libllama.so.0.5.0": "sha256:e806c986e7fb87b6ad4b60a5b234d91ab243614961cf0b2d564c391cfc6cd182",
+        "runtime.libllama-fit-params-impl.so": "sha256:144b5ff358b4bb9e98f60b13dcb972edb0f0fc146efe071d85fee3ab88b6fdb2",
+        "runtime.libllama-cli-impl.so": "sha256:9c4e4833b5086f2f3ccb43bcb7137edcce3a7c002cca63cd5919b4fa7661d867",
+        "runtime.libggml-cpu-x64.so": "sha256:f5be331c98bf891ea2d91b4de942d3729139b79706d493461d1ac4c0ac8c43cd",
+        "runtime.libggml-cpu-zen4.so": "sha256:efa0ce247eb01c7d8b0bda42dc71f21b0d3b88e196c09ef0fb43f7e51779db89",
+        "runtime.libggml-cpu-cascadelake.so": "sha256:8b8eadaeb6789f0094ead04d8b0c9989e15db915b928c93d63f69fe749f7bf6c",
+        "runtime.libggml-cpu-cooperlake.so": "sha256:b0c7ab6273b43bf2481bff266141695c3911a716db29e4bc7ddb8f3dce44dcd6",
+        "runtime.libggml-rpc.so": "sha256:00edb40a3cd8c52fd5a7e02f04dd99f3d4bdc52b41e8df6c9ccc8f2bfa3da1cb",
+        "runtime.libggml.so.0.25.3": "sha256:c267dbbf8bf1a49254c780ab3ed6f5918eb1f0ce2b59d008c866815174765162",
+        "runtime.libllama-completion-impl.so": "sha256:6841045e3205c6bc9436d9b64bc0b7844a75a0b5ecaca11c588865cbb95a5b82",
+        "runtime.libggml-cpu-piledriver.so": "sha256:0ae1f19ef1e6be3af5b8a11975da215280660825da3fcf1109397e1c45ca2bb2",
+        "runtime.libggml-cpu-alderlake.so": "sha256:ef7b3dee8c0229c8c8000c7053d0e180d84966c1670fec8c3aa40f44896134e6",
+        "runtime.libllama-server-impl.so": "sha256:1a174c69bcc0291c996f9802fac48bc1040c068387db0a63203d974fb3c585ab",
+        "runtime.libllama-perplexity-impl.so": "sha256:d107ff44a8bf3b11a36cae1695e8aa9fb91f9589faa9de0197d299ce535879eb",
+        "runtime.libggml-cpu-sse42.so": "sha256:047527618cd047ae486a0213654d0e672a0e49e25c53410ab2623542779d5863",
+        "runtime.libllama-bench-impl.so": "sha256:27d11c32b2be7e3eb5cc7c6e1fe668ad577504adda52f75e91ae186256fb3d84",
+        "runtime.libggml-cpu-sandybridge.so": "sha256:d70f22232e59ef3251aab5b59d5989a22ffc67a8f398837cf2c7dfbd73af678b",
+        "runtime.libmtmd.so.0.5.0": "sha256:b5ca0f430e4bfe052404377f7adcdc478fa10bc6efe5667bbf14b7d48ccffb9a",
+        "runtime.libggml-cpu-sapphirerapids.so": "sha256:5e269056474645a0a8786df8dd8cee59f7abdd13a645ceade5b88bdccb6be6c4"
+      }
+    },
+    "contextSize": 8192,
+    "maxInputCharacters": 6000,
+    "maxOutputTokens": 1024,
+    "reasoningMode": "off"
+  },
+  "startedAt": "2026-09-27T15:51:03.902Z",
+  "finishedAt": "2026-09-27T15:53:13.418Z",
+  "serverListening": false,
+  "firstAttempt": {
+    "passed": false,
+    "reason": "Default reasoning exhausted the 1024 token budget; output rejected, not archived"
+  },
+  "passed": true,
+  "results": [
+    {
+      "operation": "text.generate.v1",
+      "status": "succeeded",
+      "profileId": "f42cbb45e4a0dada2d4b9e9bfb42c07002c5ebef6e37dc431b2267c0a8bec79b",
+      "output": {
+        "kind": "text",
+        "size": 69,
+        "sha256": "bbeb43a3e6b3ab4fa704550fb2952bdc10a48e5bbaed804cca9f0f541bbaf22b",
+        "text": "清晨的阳光穿透薄雾，洒在沾满露珠的翠绿树叶上。"
+      },
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "2"
+        }
+      ]
+    },
+    {
+      "operation": "prompt.optimize.v1",
+      "status": "succeeded",
+      "profileId": "f42cbb45e4a0dada2d4b9e9bfb42c07002c5ebef6e37dc431b2267c0a8bec79b",
+      "output": {
+        "kind": "text",
+        "size": 72,
+        "sha256": "a2e1b1b1b56a095688b31894c9cedec64fac4309593d8d713842bebc38b28b2e",
+        "text": "一个蓝色玻璃杯放在木桌上，保持蓝色，不增加文字。"
+      },
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "2"
+        }
+      ]
+    },
+    {
+      "operation": "prompt.optimize.v1",
+      "status": "succeeded",
+      "profileId": "f42cbb45e4a0dada2d4b9e9bfb42c07002c5ebef6e37dc431b2267c0a8bec79b",
+      "output": {
+        "kind": "text",
+        "size": 343,
+        "sha256": "7077362e93cf80ad23fa86081d37b26fd8a4fa6a53c063006a462d8333275a09",
+        "text": "integrated_multimodal_description: A static shot of a blue ceramic cup slowly rotating on a wooden table surface; the camera remains fixed throughout the 5-second duration with no cuts or camera movement. Visible text: N/A.\noverall_soundscape: N/A (No environmental sounds or dialogue requested; audio track is silent).\nnon_diegetic_music: N/A"
+      },
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "2"
+        }
+      ]
+    },
+    {
+      "operation": "text.generate.v1",
+      "status": "cancelled",
+      "queuedFollower": true
+    },
+    {
+      "operation": "text.generate.v1",
+      "status": "succeeded",
+      "profileId": "f42cbb45e4a0dada2d4b9e9bfb42c07002c5ebef6e37dc431b2267c0a8bec79b",
+      "output": {
+        "kind": "text",
+        "size": 21,
+        "sha256": "2bf55b53e0a9684e79bff41543ff52036ef6e5f517ad5c8e762400c4a9a01383",
+        "text": "取消后已恢复。"
+      },
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "2"
+        }
+      ]
+    },
+    {
+      "operation": "image.generate.v1",
+      "status": "succeeded",
+      "profileId": "5c81e3c63d1ef27dcd220eaf09bdf002bd14e45a3f7370408c36dd723bb63a07",
+      "output": {
+        "kind": "image",
+        "size": 294000,
+        "sha256": "57af9ba213c10fe368a24e76fdd996d250efb55e4fb64143dcc0e62e66e97286"
+      },
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "746"
+        }
+      ]
+    },
+    {
+      "operation": "text.generate.v1",
+      "status": "succeeded",
+      "profileId": "f42cbb45e4a0dada2d4b9e9bfb42c07002c5ebef6e37dc431b2267c0a8bec79b",
+      "output": {
+        "kind": "text",
+        "size": 36,
+        "sha256": "9a10c8b512213f06c078119facb9f25e3298f7d34c8632cd2ebcf20b7431bdcc",
+        "text": "图片执行器切换后已恢复。"
+      },
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 5090",
+          "totalMiB": "32607",
+          "usedMiB": "2"
+        }
+      ]
+    }
+  ],
+  "cancelMs": 1000,
+  "management": {
+    "path": "operator-only temporary SSH forwarding",
+    "count": 106,
+    "activeTaskSamples": 58,
+    "failed": 0,
+    "p95Ms": 333,
+    "maxMs": 432
+  },
+  "restart": {
+    "identityPreservedAfterUpgradeAndRestart": true,
+    "managementWithoutServer": true,
+    "missingModelReported": true,
+    "explicitRecoveryPassed": true,
+    "resourceQuarantined": false,
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 5090",
+        "totalMiB": "32607",
+        "usedMiB": "2"
+      }
+    ],
+    "version": "0.12.1"
+  },
+  "postRestartInference": {
+    "passed": true,
+    "results": [
+      {
+        "operation": "text.generate.v1",
+        "status": "succeeded",
+        "profileId": "f42cbb45e4a0dada2d4b9e9bfb42c07002c5ebef6e37dc431b2267c0a8bec79b",
+        "output": {
+          "kind": "text",
+          "size": 69,
+          "sha256": "6bb45a60f729add840b2d255ae32e2db1d5c698e256cef75a626fa6fca63b5c8",
+          "text": "清晨的森林薄雾缭绕，阳光透过树叶洒下斑驳光影。"
+        }
+      }
+    ]
+  },
+  "tests": {
+    "worker": {
+      "total": 54,
+      "passed": 49,
+      "linuxSkipped": 5
+    },
+    "serverFocused": {
+      "total": 4,
+      "passed": 4
+    }
+  },
+  "limits": [
+    "Single Linux 5090 sample; no native Windows inference",
+    "No vision, alternative quantization, hard crash or multiple physical GPU acceptance",
+    "No new cloud image or LLM one-click installer"
+  ]
+}

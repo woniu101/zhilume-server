@@ -8,7 +8,7 @@ export function validateLanguageProfiles(profiles: any[]) {
     validateIdentity(p);
     if (p.backend !== 'llama.cpp' || p.workflowRevision !== 'language.llamacpp.v1' || typeof p.modelId !== 'string' || !p.modelId || p.modelId.length > 160 ||
         !Array.isArray(p.operations) || p.operations.length !== 2 || !languageOperations.every(o => p.operations.includes(o)) ||
-        JSON.stringify(p.capabilities) !== '["text"]' || JSON.stringify(p.outputFormats) !== '["txt"]' || p.maxImages !== 0 ||
+        JSON.stringify(p.capabilities) !== '["text"]' || JSON.stringify(p.outputFormats) !== '["txt"]' || p.maxImages !== 0 || !['off','auto'].includes(p.reasoningMode) ||
         !Number.isInteger(p.maxInputCharacters) || p.maxInputCharacters < 1 || p.maxInputCharacters > 12000 ||
         !Number.isInteger(p.maxOutputTokens) || p.maxOutputTokens < 16 || p.maxOutputTokens > 4096 ||
         !Number.isInteger(p.contextSize) || p.contextSize < 2048 || p.contextSize > 32768)
