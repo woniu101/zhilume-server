@@ -95,3 +95,12 @@ Worker 面板有概览、执行器、环境、接入、诊断五页。复杂部�
 - `GET /management/api/executors/{kind}/logs`：最近 60 条脱敏部署事件（尾部读取上限 128000 字节），含开始、结束、检查明细。引擎限定 image/speech/video；读取无写入副作用，服务重启后仍可读。
 
 ComfyUI 服务由部署者管理进程、Python、GPU 和模型目录。Qwen/H3 表单配置服务入口与模型规格，IndexTTS 表单配置本机独立 Python 路径。环境检查不代表 GPU 推理已验收。
+
+
+## Worker 本机托管运行环境（0.10）
+
+管理配置新增独立 runtimes.json；运行服务由本机 runtimeId 引用，与模型规格、调度 profileId 分离。两个 Worker 的 runtimeId/Python/目录/端口不同不改变等价模型匹配。公开任务协议仍为 3.0。
+
+部署管理 API（仅 management-token）：PUT /management/api/runtimes/{id} 保存服务配置；POST /management/api/runtimes/{id}/{check|start|stop} 返回异步 operationId。stop body 的 policy 为 wait 或 cancel，作用于全部关联执行器。overview/diagnostics 包含 runtimes 与配置故障原因。执行器配置 runtimeId 为空时复用原外部 URL；不为空时由托管配置解析本机 URL，不接受 Studio 或任务载荷指定程序路径。
+
+核心安装与回退、服务进程管理均不提交推理任务。GPU 隔离不会因服务进程退出而清除；原服务恢复启动后仍须执行器 release 检查确认，再发布模型能力。具体部署与未验收项见 Worker deploy/portable.md 及 worker-portable-acceptance-2026-09-27.md。

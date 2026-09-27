@@ -1,5 +1,10 @@
 # 开发与验收记录
 
+## Worker 通用部署 0.10
+
+新增统一 Linux 发布安装/升级/回退、托管 ComfyUI 进程及共享服务管理界面。PRD v0.25；Studio/Server 产品版本和任务协议不变。CPU 发布与管理验收见 [部署验收](worker-portable-acceptance-2026-09-27.md)。真实 GPU 托管、其他云、自有机器与完整 CUDA 安装仍待验收；语言模型执行器继续作为下一阶段。
+
+
 当前版本：Studio 0.13.0 / Server 0.10.0 / Worker 0.9.0。统一模型、独立语言服务、多 Worker 队列、显式依赖和 Worker 管理面板已实现；本轮测试与未覆盖项以 [最新验收](model-scheduling-acceptance-2026-09-27.md) 为准。下文为历史版本记录。
 
 
