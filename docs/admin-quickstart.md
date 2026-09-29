@@ -2,9 +2,11 @@
 
 ## 启动、凭证与关闭
 
-EXE 的启动器负责 Server 子进程、端口、数据目录和托盘；点击“启动 Server”只启动服务，服务就绪后按需点击“打开管理台”，本机管理台自动登录。管理台是同一套 Web 页面，关闭管理台不会停止 Server；启动器运行期间关闭窗口会收起到托盘，停止服务或“停止并退出”才结束自有进程。
+EXE 的启动器负责 Server 子进程、端口、数据目录和托盘；点击“启动 Server”只启动服务，服务就绪后按需点击“打开管理台”，本机管理台自动登录。管理台是同一套 Web 页面，关闭管理台不会停止 Server；启动器关闭默认询问，可在“启动器设置”选择每次询问、最小化到托盘或停止服务并退出；设置立即持久化，运行中也可修改。执行中任务的停止确认仍保留。
 
-终端：`npm run build` 后 `npm start`（开发用 `npm run dev`）。日志显示管理台地址、数据目录和凭证来源，不打印密钥。在相同工作目录和相同环境变量下运行 `npm run credential` 获取访问凭证，然后访问日志中的 `/admin/`。若配置 `ZHILUME_TOKEN`，凭证来自该变量；否则是 `ZHILUME_DATA/admin-token`。默认终端数据目录为仓库 `.data`；EXE 为启动器显示的用户数据目录，两者不自动共享。需要共享时显式配置同一数据目录，且不要同时启动两个服务访问它。
+终端：`npm run build` 后 `npm start`（开发用 `npm run dev`）。日志显示管理台地址、数据目录和凭证来源，不打印密钥。在 Server 项目目录运行 `npm run credential` 获取访问凭证，然后访问日志中的 `/admin/`。若配置 `ZHILUME_TOKEN`，凭证来自该变量；否则是 `ZHILUME_DATA/admin-token`。终端和 EXE 共用 `runtime/config.cjs`：环境变量优先，其次启动器保存配置，最后平台用户目录。Windows 默认为 `%APPDATA%/zhilume-server/data`。普通新终端无需再设置环境变量；如果使用自定义 `ZHILUME_DATA` 或 `ZHILUME_USER_DATA`，凭证命令也需使用该设置。不会自动合并或搬迁之前仓库 `.data` 中的数据。不要同时启动两个服务访问同一数据目录。
+
+网页登录默认填写当前站点的 origin，桌面 Studio 默认 `http://127.0.0.1:4310`；优先保留此前保存的地址。Studio 首页与画布每 3 秒探测一次已认证的 Server API，单次超时 3 秒，显示检查中、已连接、连接中断或登录失效。断线不销毁画布草稿，恢复后自动更新连接状态。
 
 “已连接 Server”仅表示管理台能访问 Server，GPU 是否可用由执行端状态单独表示。没有 Worker 仍可管理项目、素材、API 模型和执行 Server FFmpeg 任务。
 

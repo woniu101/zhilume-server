@@ -48,7 +48,7 @@ supervisorctl -c /usr/supervisor/supervisord.conf start zhilume-foundation
 
 打开 `zhilume-studio/release/win-unpacked/Zhilume Studio.exe`，Server 地址填启动器显示的地址（默认 `http://127.0.0.1:4310`）。点击 Server 启动器“复制访问凭证”，粘贴到 Studio 登录。这里既不是 Worker 接入凭证，也不是模型 API Key。
 
-使用同一个 Server 数据目录，才能看到同一批项目与素材。终端默认 `.data` 与 EXE 默认用户数据目录不同；切换启动方式不要误当成项目丢失。
+终端与 EXE 默认共用启动器配置、数据目录和凭证，切换启动方式能看到相同项目与素材。不要同时启动两个服务使用同一目录或端口。显式设置 ZHILUME_DATA 时，凭证命令也需使用该设置。
 
 ## 4. 先手动跑通每项能力
 

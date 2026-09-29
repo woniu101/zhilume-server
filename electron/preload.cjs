@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld("launcher", {
   browser: () => ipcRenderer.invoke("server:browser"),
   directory: () => ipcRenderer.invoke("server:directory"),
   configure: (value) => ipcRenderer.invoke("server:configure", value),
+  closeBehavior: (value) => ipcRenderer.invoke("server:close-behavior", value),
+  confirm: (value) => ipcRenderer.invoke("server:confirm", value),
   copy: () => ipcRenderer.invoke("server:copy"),
   subscribe: (callback) =>
     ipcRenderer.on("server:state", (_event, value) => callback(value)),

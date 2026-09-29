@@ -98,7 +98,7 @@ export function Login({
   connected: () => void;
   server?: boolean;
 }) {
-  const [base, setBase] = useState(connection.base);
+  const [base, setBase] = useState(connection.base || location.origin);
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -136,7 +136,8 @@ export function Login({
             aria-label="Server 地址"
             value={base}
             onChange={(e) => setBase(e.target.value)}
-            placeholder="留空使用当前站点 / 本地开发代理"
+            placeholder="https://你的 Server 地址"
+            required
           />
         </label>
         <label>
@@ -156,7 +157,7 @@ export function Login({
           {busy ? "正在连接…" : "连接 Server"}
         </button>
         <small className="muted">
-          EXE：在启动器复制访问凭证。终端：在相同数据目录配置下运行 npm run credential。
+          EXE：在启动器复制访问凭证。终端：运行 npm run credential。自定义数据目录时需设置 ZHILUME_DATA。
         </small>
       </form>
     </div>

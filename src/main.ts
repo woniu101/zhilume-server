@@ -1,6 +1,9 @@
 import { createApp } from "./server.js";
 import { resolve } from "node:path";
-const root = resolve(process.env.ZHILUME_DATA || ".data");
+import { createRequire } from "node:module";
+const { resolveRuntimeConfig } = createRequire(import.meta.url)("../runtime/config.cjs");
+const config = resolveRuntimeConfig();
+const root = config.dataDirectory;
 const app = await createApp({
   root,
   token: process.env.ZHILUME_TOKEN,
@@ -9,7 +12,7 @@ const app = await createApp({
 try {
   const address = await app.listen({
     host: process.env.ZHILUME_HOST || "127.0.0.1",
-    port: Number(process.env.ZHILUME_PORT || 4310),
+    port: config.port,
   });
   console.log(`管理台：${address}/admin/`);
   console.log(`数据目录：${root}`);

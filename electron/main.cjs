@@ -24,13 +24,17 @@ let window,
   stopping = false,
   quitting = false,
   ready = false;
-let config = { port: 4310, dataDirectory: "" };
+const { resolveRuntimeConfig } = require("../runtime/config.cjs");
+const runtime = resolveRuntimeConfig();
+let config = { port: runtime.port, dataDirectory: runtime.dataDirectory, closeBehavior: runtime.closeBehavior };
+let closePromptOpen = false;
+const { createConfirmation } = require("../runtime/confirmation.cjs");
+const confirmation = createConfirmation(publish);
 const address = () => `http://127.0.0.1:${config.port}`;
 const icon = join(__dirname, "../assets/icon.ico");
 const configFile = () => join(app.getPath("userData"), "launcher-config.json");
 const tokenFile = () => join(config.dataDirectory, "admin-token");
-if (process.env.ZHILUME_USER_DATA)
-  app.setPath("userData", resolve(process.env.ZHILUME_USER_DATA));
+app.setPath("userData", runtime.userDirectory);
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on("second-instance", () => {
   window?.show();
@@ -42,6 +46,8 @@ function snapshot() {
     ready,
     address: address(),
     port: config.port,
+    closeBehavior: config.closeBehavior,
+    confirmation: confirmation.current,
     dataDirectory: config.dataDirectory,
     logs: logs.slice(-100),
   };
@@ -183,17 +189,14 @@ async function stop() {
         });
         const stats = await response.json();
         if (stats.running > 0) {
-          const answer = await dialog.showMessageBox(window, {
-            type: "warning",
-            buttons: ["继续运行", "停止服务"],
-            defaultId: 0,
-            cancelId: 0,
-            message: `当前有 ${stats.running} 个任务执行中，停止服务会中断连接。`,
-          });
-          if (answer.response === 0) return snapshot();
+          window.show();
+          window.focus();
+          const answer = await confirmation.request("stop", { taskCount: stats.running });
+          if (answer.action !== "stop") return snapshot();
         }
       } catch {}
     const owned = child;
+    if (!owned) return snapshot();
     await new Promise((resolve) => {
       const timer = setTimeout(resolve, 3500);
       owned.once("exit", () => {
@@ -216,20 +219,35 @@ async function quit() {
     app.quit();
   }
 }
+async function handleLauncherClose() {
+  if (closePromptOpen || stopping) return;
+  closePromptOpen = true;
+  try {
+    let behavior = config.closeBehavior;
+    if (behavior === "ask") {
+      const answer = await confirmation.request("close", { running: !!child });
+      if (answer.action === "cancel") return;
+      behavior = answer.action;
+      if (answer.remember) {
+        config.closeBehavior = behavior;
+        mkdirSync(app.getPath("userData"), { recursive: true });
+        writeFileSync(configFile(), JSON.stringify(config, null, 2));
+        publish();
+      }
+    }
+    if (behavior === "quit") await quit();
+    else {
+      window.hide();
+      if (tray && !tray.__notified) {
+        tray.displayBalloon({ title: "Zhilume Server 已收起到托盘", content: "服务状态保持不变。右键托盘可显示启动器或停止并退出。" });
+        tray.__notified = true;
+      }
+    }
+  } catch (error) { record(error.message); }
+  finally { closePromptOpen = false; }
+}
 app.whenReady().then(() => {
   app.setAppUserModelId("app.zhilume.server");
-  config.dataDirectory = join(app.getPath("userData"), "data");
-  try {
-    const saved = JSON.parse(readFileSync(configFile(), "utf8"));
-    if (
-      Number.isInteger(saved.port) &&
-      saved.port >= 1024 &&
-      saved.port <= 65535 &&
-      typeof saved.dataDirectory === "string" &&
-      saved.dataDirectory
-    )
-      config = saved;
-  } catch {}
   const onlyLauncher =
     (fn) =>
     (event, ...args) => {
@@ -246,6 +264,7 @@ app.whenReady().then(() => {
   );
   ipcMain.handle("server:start", onlyLauncher(start));
   ipcMain.handle("server:stop", onlyLauncher(stop));
+  ipcMain.handle("server:confirm", onlyLauncher(value => confirmation.respond(value)));
   ipcMain.handle("server:open", onlyLauncher(openAdmin));
   ipcMain.handle(
     "server:browser",
@@ -284,13 +303,21 @@ app.whenReady().then(() => {
         !value.dataDirectory.trim()
       )
         throw new Error("请选择数据目录");
-      config = { port, dataDirectory: resolve(value.dataDirectory) };
+      config = { ...config, port, dataDirectory: resolve(value.dataDirectory) };
       mkdirSync(app.getPath("userData"), { recursive: true });
       writeFileSync(configFile(), JSON.stringify(config, null, 2));
       record("配置已保存。更换数据目录不会迁移已有数据。");
       return snapshot();
     }),
   );
+  ipcMain.handle("server:close-behavior", onlyLauncher((value) => {
+    if (!["ask", "tray", "quit"].includes(value)) throw new Error("无效的关闭行为");
+    config.closeBehavior = value;
+    mkdirSync(app.getPath("userData"), { recursive: true });
+    writeFileSync(configFile(), JSON.stringify(config, null, 2));
+    publish();
+    return snapshot();
+  }));
   ipcMain.handle("admin:open-storage", async (event) => {
     if (!ready || !adminWindow || event.sender !== adminWindow.webContents || event.senderFrame !== adminWindow.webContents.mainFrame || !event.senderFrame.url.startsWith(address() + "/admin/")) throw new Error("Invalid admin sender");
     const directory = join(config.dataDirectory, "assets");
@@ -332,18 +359,11 @@ app.whenReady().then(() => {
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.loadFile(join(__dirname, "launcher.html"));
+  window.on("closed", () => confirmation.cancel());
   window.on("close", (event) => {
-    if (child && !quitting) {
-      event.preventDefault();
-      window.hide();
-      if (!tray.__notified) {
-        tray.displayBalloon({
-          title: "Zhilume Server 正在后台运行",
-          content: "右键托盘图标可以打开管理台或停止并退出。",
-        });
-        tray.__notified = true;
-      }
-    }
+    if (quitting) return;
+    event.preventDefault();
+    void handleLauncherClose();
   });
   tray = new Tray(icon);
   tray.setToolTip("Zhilume Server");

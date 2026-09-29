@@ -181,9 +181,13 @@ h3 {
   letter-spacing: -0.7px;
   font-weight: 650;
 }
+.brand > span:last-child {
+  line-height: 1.2;
+}
 .brand small {
+  line-height: 1.2;
   display: block;
-  font-size: 12px;
+  font-size: 9px;
   letter-spacing: 2px;
   color: var(--muted);
   margin-top: 2px;
@@ -224,7 +228,7 @@ h3 {
   background: var(--panel);
   box-shadow: var(--shadow);
 }
-.login-card small {
+.login-card > small {
   display: block;
   line-height: 1.8;
   margin-top: 20px;

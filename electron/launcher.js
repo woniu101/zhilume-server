@@ -1,4 +1,6 @@
 const $ = (id) => document.getElementById(id);
+let activeConfirmation = null;
+let confirmationBusy = false;
 function render(state) {
   $("status").textContent = state.running
     ? state.ready
@@ -12,6 +14,7 @@ function render(state) {
   $("browser").disabled = !state.ready;
   $("address").textContent = state.address;
   $("port").value = state.port;
+  $("close-behavior").value = state.closeBehavior;
   $("data-path").value = state.dataDirectory;
   for (const id of ["port", "directory-picker", "configure"])
     $(id).disabled = state.running;
@@ -19,6 +22,7 @@ function render(state) {
   $("directory").textContent = state.dataDirectory;
   $("logs").textContent = state.logs.join("\n") || "等待服务启动…";
   $("logs").scrollTop = $("logs").scrollHeight;
+  renderConfirmation(state.confirmation);
 }
 for (const action of ["start", "stop", "open", "copy", "browser"])
   $(action).onclick = async () => {
@@ -70,3 +74,70 @@ $("configure").onclick = async () => {
     $("message").textContent = e.message;
   }
 };
+
+$("close-behavior").onchange = async () => {
+  try {
+    render(await window.launcher.closeBehavior($("close-behavior").value));
+    $("message").textContent = "关闭行为已保存";
+  } catch (e) { $("message").textContent = e.message; }
+};
+
+function selectedCloseAction() {
+  return document.querySelector('input[name="close-action"]:checked').value;
+}
+function updateConfirmButton() {
+  $("confirm-submit").textContent = activeConfirmation?.kind === "stop" ? "停止服务"
+    : selectedCloseAction() === "tray" ? "收起到托盘"
+    : activeConfirmation?.running ? "停止并退出" : "退出启动器";
+}
+function renderConfirmation(value) {
+  const modal = $("confirmation");
+  if (!value) {
+    activeConfirmation = null;
+    if (modal.open) modal.close();
+    return;
+  }
+  if (activeConfirmation?.id === value.id) return;
+  activeConfirmation = value;
+  confirmationBusy = false;
+  const isClose = value.kind === "close";
+  $("confirm-title").textContent = isClose ? "关闭启动器" : "停止正在运行的服务？";
+  $("confirm-description").textContent = isClose
+    ? value.running ? "Server 正在运行，选择关闭后的处理方式。" : "Server 尚未启动，你可以收起窗口或直接退出。"
+    : `当前有 ${value.taskCount} 个任务正在执行。停止服务会断开 Studio 与执行端连接，任务可能中断。`;
+  $("close-options").hidden = !isClose;
+  $("remember-option").hidden = !isClose;
+  $("tray-description").textContent = value.running ? "保持服务运行，稍后从托盘重新打开。" : "保留启动器，稍后从托盘重新打开。";
+  $("quit-label").textContent = value.running ? "停止服务并退出" : "退出启动器";
+  $("quit-description").textContent = value.running ? "断开 Studio 与管理台连接。项目数据会保留。" : "关闭应用，不影响已保存的项目与素材。";
+  document.querySelector('input[name="close-action"][value="tray"]').checked = true;
+  $("confirm-remember").checked = false;
+  $("confirm-error").hidden = true;
+  for (const button of modal.querySelectorAll('button')) button.disabled = false;
+  $("confirm-cancel").textContent = isClose ? "取消" : "继续运行";
+  updateConfirmButton();
+  if (!modal.open) modal.showModal();
+  $("confirm-cancel").focus();
+}
+async function finishConfirmation(action) {
+  if (!activeConfirmation || confirmationBusy) return;
+  confirmationBusy = true;
+  const requestId = activeConfirmation.id;
+  for (const button of $("confirmation").querySelectorAll('button')) button.disabled = true;
+  try {
+    await window.launcher.confirm({ id: requestId, action, remember: $("confirm-remember").checked });
+  } catch (error) {
+    if (activeConfirmation?.id === requestId) {
+      $("confirm-error").textContent = error.message;
+      $("confirm-error").hidden = false;
+      for (const button of $("confirmation").querySelectorAll('button')) button.disabled = false;
+    }
+  } finally { confirmationBusy = false; }
+}
+$("confirm-form").onsubmit = event => {
+  event.preventDefault();
+  void finishConfirmation(activeConfirmation?.kind === "stop" ? "stop" : selectedCloseAction());
+};
+$("confirm-cancel").onclick = $("confirm-dismiss").onclick = () => void finishConfirmation("cancel");
+$("confirmation").addEventListener("cancel", event => { event.preventDefault(); void finishConfirmation("cancel"); });
+for (const input of document.querySelectorAll('input[name="close-action"]')) input.onchange = updateConfirmButton;

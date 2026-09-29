@@ -22,7 +22,7 @@ npm run build
 npm start
 ```
 
-默认监听 `http://127.0.0.1:4310`，管理台在 `/admin/`。首次启动自动创建 `.data/admin-token`，将其中的访问凭证粘贴到管理台或 Studio。不要提交 `.data` 或凭证。
+默认监听 `http://127.0.0.1:4310`，管理台在 `/admin/`。首次启动在数据目录自动创建 `admin-token`，将其中的访问凭证粘贴到管理台或 Studio。终端运行 `npm run credential` 查看凭证，不要提交运行数据或凭证。
 
 后端热更新：`npm run dev`。管理台热更新：另一个终端执行 `npm run dev:admin`，打开 `http://127.0.0.1:5174/admin/`。
 
@@ -30,7 +30,7 @@ npm start
 |---|---|
 | `ZHILUME_HOST` | `127.0.0.1` |
 | `ZHILUME_PORT` | `4310` |
-| `ZHILUME_DATA` | 当前目录下 `.data` |
+| `ZHILUME_DATA` | 与 EXE 共用启动器配置；Windows 默认 `%APPDATA%/zhilume-server/data` |
 | `ZHILUME_TOKEN` | 留空自动生成管理员凭证 |
 | `ZHILUME_ORIGINS` | 本地 Studio/Admin 开发地址与两个 Electron app 来源；覆盖时用逗号分隔完整来源 |
 | `ZHILUME_UPLOAD_LIMIT` | 单文件 1 GiB；文本另限 12,000 字 |
@@ -45,7 +45,7 @@ npm run pack
 
 输出 `release/win-unpacked/Zhilume Server.exe`。运行时必须保留同目录的 DLL、resources 等文件；分发时复制整个 `win-unpacked` 文件夹，不要只取 EXE。
 
-启动器内置 Electron 的 Node 运行环境，不调用全局 `node.exe`。点击“启动 Server”，再“打开管理台”“复制访问凭证”。数据放在 `%APPDATA%/zhilume-server/data`，与开发模式 `.data` 相互独立。默认端口 4310，可在“服务配置”中修改端口与数据目录（先停止服务）。更换目录不自动迁移文件。服务运行时关闭启动器收起到托盘，右键托盘可“停止并退出”；不停止其他程序启动的 Server。
+启动器内置 Electron 的 Node 运行环境，不调用全局 `node.exe`。点击“启动 Server”，再“打开管理台”“复制访问凭证”。终端与 EXE 共用启动器配置和默认数据目录 `%APPDATA%/zhilume-server/data`。Linux 默认 `${XDG_CONFIG_HOME:-~/.config}/zhilume-server/data`，macOS 默认 `~/Library/Application Support/zhilume-server/data`；显式 `ZHILUME_DATA` 优先。默认端口 4310，可在“服务配置”中修改端口与数据目录（先停止服务）。更换目录不自动迁移文件。关闭启动器默认询问，可在“启动器设置”选择每次询问、最小化到托盘或停止服务并退出；右键托盘可“停止并退出”；不停止其他程序启动的 Server。
 
 “打开管理台”打开独立的 Server Admin 窗口并自动连接本机服务；“服务配置”还提供外部浏览器入口。两者均访问当前端口的 `/admin/`。Admin 与 Studio 的登录存储相互独立。
 
