@@ -30,7 +30,7 @@ for (const action of ["start", "stop", "open", "copy", "browser"])
           ? "访问凭证已复制，请在 Studio 或管理台中粘贴。"
           : action === "open"
             ? "已打开独立的 Zhilume Server 管理台。"
-            : "首次连接 Studio 或管理台时，粘贴本机访问凭证。";
+            : "连接 Studio 或外部浏览器时，复制访问凭证使用。";
     } catch (e) {
       $("message").textContent = e.message;
     }

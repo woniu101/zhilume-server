@@ -147,7 +147,7 @@ export function Login({
             autoComplete="current-password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            placeholder="由 Server 启动器提供"
+            placeholder="启动器复制凭证 / 终端 npm run credential"
             required
           />
         </label>
@@ -156,7 +156,7 @@ export function Login({
           {busy ? "正在连接…" : "连接 Server"}
         </button>
         <small className="muted">
-          当前版本支持画布与模拟任务；尚未接入真实生成模型。
+          EXE：在启动器复制访问凭证。终端：在相同数据目录配置下运行 npm run credential。
         </small>
       </form>
     </div>

@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self';"
     />
-    <title>Zhilume Server</title>
+    <title>Zhilume Server · 启动器 · 织镜</title>
     <link rel="stylesheet" href="launcher.css" />
   </head>
   <body>
@@ -33,13 +33,13 @@
           ><code id="address">127.0.0.1:4310</code>
         </div>
         <div class="buttons">
-          <button id="start" class="primary">启动 Server</button
+          <button id="start" class="primary">启动并打开管理台</button
           ><button id="stop">停止服务</button
           ><button id="open">打开管理台</button
           ><button id="copy">复制访问凭证</button>
         </div>
         <p id="message" role="status">
-          首次连接 Studio 或管理台时，粘贴本机访问凭证。
+          启动后自动打开本机管理台。连接 Studio 或外部浏览器时，复制访问凭证使用。
         </p>
       </section>
       <details>
@@ -65,7 +65,7 @@
         <span>数据保存在</span><code id="directory"></code>
       </div>
       <p class="note">
-        当前版本提供模拟执行能力。Server 独立运行，关闭 Studio 不影响服务。
+        Server 独立管理项目、素材和任务；关闭 Studio 或管理台不会停止服务。
       </p>
     </main>
     <script src="launcher.js"></script>

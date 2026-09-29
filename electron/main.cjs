@@ -84,7 +84,7 @@ async function openAdmin() {
     height: 900,
     minWidth: 850,
     minHeight: 640,
-    title: "Zhilume Server 管理台",
+    title: "Zhilume Server · 管理台 · 织镜",
     icon,
     autoHideMenuBar: true,
     backgroundColor: "#141414",
@@ -163,6 +163,7 @@ async function start() {
       if (response.ok) {
         ready = true;
         record("Server 已就绪，管理台 " + address() + "/admin/");
+        try { await openAdmin(); } catch (e) { record("管理台打开失败：" + e.message); }
         break;
       }
     } catch {}
@@ -291,6 +292,13 @@ app.whenReady().then(() => {
       return snapshot();
     }),
   );
+  ipcMain.handle("admin:open-storage", async (event) => {
+    if (!ready || !adminWindow || event.sender !== adminWindow.webContents || event.senderFrame !== adminWindow.webContents.mainFrame || !event.senderFrame.url.startsWith(address() + "/admin/")) throw new Error("Invalid admin sender");
+    const directory = join(config.dataDirectory, "assets");
+    mkdirSync(directory, { recursive: true });
+    const error = await shell.openPath(directory);
+    if (error) throw new Error("无法打开素材目录：" + error);
+  });
   ipcMain.handle("admin:session", async (event) => {
     if (
       !adminWindow ||
@@ -312,7 +320,7 @@ app.whenReady().then(() => {
     height: 900,
     minWidth: 720,
     minHeight: 700,
-    title: "Zhilume Server",
+    title: "Zhilume Server · 启动器 · 织镜",
     icon,
     backgroundColor: "#141414",
     autoHideMenuBar: true,

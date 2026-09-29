@@ -1,6 +1,6 @@
 declare global {
   interface Window {
-    zhilumeAdmin?: { session: () => Promise<{ token: string }> };
+    zhilumeAdmin?: { session: () => Promise<{ token: string }>; openStorage?: () => Promise<void> };
   }
 }
 export async function restoreAdminSession() {

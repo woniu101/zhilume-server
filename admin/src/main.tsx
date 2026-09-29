@@ -1,4 +1,5 @@
-import { LanguageProviders } from './LanguageProviders';
+import { AssetStorage } from "./AssetStorage";
+import { LanguageProviders } from "./LanguageProviders";
 import metadata from "../../package.json";
 import catalog from "../../contracts/operation-catalog.json";
 import { useEffect, useState } from "react";
@@ -32,6 +33,7 @@ function App() {
   const [connected, setConnected] = useState(!!connection.token),
     [page, setPage] = useState("overview"),
     [stats, setStats] = useState<any>(null),
+    [system, setSystem] = useState<any>(null),
     [workers, setWorkers] = useState<any[]>([]),
     [jobs, setJobs] = useState<any[]>([]),
     [assets, setAssets] = useState<any[]>([]),
@@ -40,7 +42,7 @@ function App() {
     [probe, setProbe] = useState<any>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [reachable, setReachable] = useState(true);
+    [reachable, setReachable] = useState<boolean | null>(null);
   useEffect(() => {
     void restoreAdminSession()
       .then(() => {
@@ -56,12 +58,14 @@ function App() {
         api("/jobs"),
         api("/assets"),
         api("/projects"),
+        api("/system"),
       ]);
       setStats(values[0]);
       setWorkers(values[1]);
       setJobs(values[2]);
       setAssets(values[3]);
       setProjects(values[4]);
+      setSystem(values[5]);
       setReachable(true);
     } catch (e) {
       setReachable(false);
@@ -106,16 +110,36 @@ function App() {
     }
   }
   function editWorker(worker?: any) {
-    setEditor({ id: worker?.id, name: worker?.name || "", address: worker?.address || "", credential: "" }); setProbe(null);
+    setEditor({
+      id: worker?.id,
+      name: worker?.name || "",
+      address: worker?.address || "",
+      credential: "",
+    });
+    setProbe(null);
   }
   async function submitWorker(testOnly: boolean) {
-    setBusy(true); setError("");
-    const body = { ...editor }; if (!body.credential && body.id) delete body.credential;
+    setBusy(true);
+    setError("");
+    const body = { ...editor };
+    if (!body.credential && body.id) delete body.credential;
     try {
       if (testOnly) setProbe(await api("/workers/probe", "POST", body));
-      else { await api(body.id ? `/workers/${body.id}` : "/workers", body.id ? "PATCH" : "POST", body); setEditor(null); await refresh(); }
-    } catch (e) { setProbe(null); setError((e as Error).message); }
-    finally { setBusy(false); }
+      else {
+        await api(
+          body.id ? `/workers/${body.id}` : "/workers",
+          body.id ? "PATCH" : "POST",
+          body,
+        );
+        setEditor(null);
+        await refresh();
+      }
+    } catch (e) {
+      setProbe(null);
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <>
@@ -130,7 +154,11 @@ function App() {
               <strong>我的创作服务</strong>
               <small>
                 <span className="dot" />
-                {reachable ? "服务运行中" : "连接中断"}
+                {reachable === null
+                  ? "正在连接 Server"
+                  : reachable
+                    ? "Server 运行中"
+                    : "连接中断"}
               </small>
             </div>
             <nav>
@@ -152,7 +180,11 @@ function App() {
               <div className="local-tag">
                 <Server size={17} />
                 <div>
-                  Zhilume Server<small>v{metadata.version} · 协议 2.0</small>
+                  Zhilume Server
+                  <small>
+                    v{system?.version || metadata.version} · 协议{" "}
+                    {system?.protocolVersion || "—"}
+                  </small>
                 </div>
               </div>
               <div className="row spread">
@@ -179,9 +211,16 @@ function App() {
                   {navigation.find((i) => i[0] === page)?.[1]}
                 </span>
               </span>
-              <span className="connection-pill">
+              <span
+                className="connection-pill"
+                title="表示管理台与 Server 通信正常；Worker 在线状态请查看执行端列表。"
+              >
                 <span className="dot" />
-                {reachable ? "服务已连接" : "服务连接中断"}
+                {reachable === null
+                  ? "正在连接 Server"
+                  : reachable
+                    ? "已连接 Server"
+                    : "Server 连接中断"}
               </span>
             </header>
             <div className="admin-content">
@@ -202,7 +241,9 @@ function App() {
                           ? "查看真实任务状态，处理失败、取消和重试。"
                           : page === "assets"
                             ? "Server 统一保管上传素材和已确认的任务结果。"
-                            : "查看服务信息与当前开发阶段。"}
+                            : page === "language"
+                              ? "接入互联网 API 与 Worker 语言模型，管理能力和默认用途。"
+                              : "查看服务版本、数据位置与诊断信息。"}
                   </p>
                 </div>
                 <div className="row">
@@ -213,14 +254,16 @@ function App() {
                   >
                     <RefreshCw size={17} />
                   </button>
-                  <button
-                    className="primary"
-                    disabled={busy}
-                    onClick={() => editWorker()}
-                  >
-                    <Plus size={15} />
-                    接入执行端
-                  </button>
+                  {["overview", "workers"].includes(page) && (
+                    <button
+                      className="primary"
+                      disabled={busy}
+                      onClick={() => editWorker()}
+                    >
+                      <Plus size={15} />
+                      接入执行端
+                    </button>
+                  )}
                 </div>
               </div>
               {page === "overview" && (
@@ -262,7 +305,11 @@ function App() {
                         <ArrowUpRight size={14} />
                       </button>
                     </div>
-                    <WorkerTable workers={workers} change={changeWorker} edit={editWorker} />
+                    <WorkerTable
+                      workers={workers}
+                      change={changeWorker}
+                      edit={editWorker}
+                    />
                   </section>
                   <section className="admin-card">
                     <div className="card-heading">
@@ -290,14 +337,20 @@ function App() {
                     <h2>已登记执行端 · {workers.length}</h2>
                     <span className="muted">单执行端并发：1</span>
                   </div>
-                  <WorkerTable workers={workers} change={changeWorker} edit={editWorker} />
+                  <WorkerTable
+                    workers={workers}
+                    change={changeWorker}
+                    edit={editWorker}
+                  />
                 </section>
               )}
               {page === "jobs" && (
                 <section className="admin-card">
                   <div className="card-heading">
                     <h2>最近 200 个任务</h2>
-                    <span className="badge">GPU 图片与语音 / CPU 处理 / 模拟</span>
+                    <span className="badge">
+                      GPU / 语言模型 API / FFmpeg / 模拟
+                    </span>
                   </div>
                   <JobTable
                     jobs={jobs}
@@ -308,69 +361,84 @@ function App() {
                 </section>
               )}
               {page === "assets" && (
-                <section className="admin-card">
-                  <div className="card-heading">
-                    <h2>已归档素材 · {assets.length}</h2>
-                    <span className="muted">删除素材库条目不删除原文件</span>
-                  </div>
-                  {assets.length ? (
-                    <div className="table-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>文件名</th>
-                            <th>类型</th>
-                            <th>大小</th>
-                            <th>归档时间</th>
-                            <th>校验</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {assets.map((a) => (
-                            <tr key={a.id}>
-                              <td>{a.filename}</td>
-                              <td>{a.kind}</td>
-                              <td>{sizeLabel(a.size)}</td>
-                              <td>{new Date(a.createdAt).toLocaleString()}</td>
-                              <td>
-                                <code title={a.sha256}>
-                                  {a.sha256.slice(0, 12)}
-                                </code>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <Empty text="还没有已归档素材" />
-                  )}
-                </section>
+                <AssetStorage assets={assets} stats={stats} />
               )}
               {page === "language" && <LanguageProviders />}
               {page === "settings" && (
                 <section className="admin-card settings-card">
-                  <h2>服务信息</h2>
+                  <div className="row spread">
+                    <h2>服务信息</h2>
+                    <button
+                      onClick={() => {
+                        const report = {
+                          generatedAt: new Date().toISOString(),
+                          system,
+                          counts: {
+                            workers: workers.length,
+                            online,
+                            assets: stats?.assets,
+                            bytes: stats?.bytes,
+                            running: stats?.running,
+                            queued: stats?.queued,
+                          },
+                          workers: workers.map((w) => ({
+                            id: w.id,
+                            state: w.state,
+                            connected: w.connected,
+                            disabled: w.disabled,
+                            draining: w.draining,
+                          })),
+                          jobs: jobs.map((j) => ({
+                            id: j.id,
+                            status: j.status,
+                            operation: j.operation,
+                          })),
+                        };
+                        const url = URL.createObjectURL(
+                          new Blob([JSON.stringify(report, null, 2)], {
+                            type: "application/json",
+                          }),
+                        );
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "zhilume-server-diagnostics.json";
+                        a.click();
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                      }}
+                    >
+                      导出脱敏诊断
+                    </button>
+                  </div>
                   <dl>
                     <dt>Server 版本</dt>
-                    <dd>0.2.2</dd>
+                    <dd>{system?.version || metadata.version}</dd>
                     <dt>协议版本</dt>
-                    <dd>1.0</dd>
+                    <dd>{system?.protocolVersion || "—"}</dd>
                     <dt>数据目录</dt>
                     <dd>
                       <code>{stats?.dataDirectory || "—"}</code>
+                    </dd>
+                    <dt>访问凭证来源</dt>
+                    <dd>
+                      <code>
+                        {stats?.tokenFile || "由 ZHILUME_TOKEN 环境变量提供"}
+                      </code>
                     </dd>
                     <dt>当前连接</dt>
                     <dd>{connection.base || location.origin}</dd>
                     <dt>持久化</dt>
                     <dd>SQLite + Server 本地文件存储</dd>
                     <dt>执行能力</dt>
-                    <dd>视频截取 / 抽音轨（CPU）、文本回显 / 素材复制（模拟）</dd>
+                    <dd>
+                      GPU Worker、语言模型 API、Server FFmpeg 独立调度；FFmpeg
+                      并发 1
+                    </dd>
                   </dl>
                   <div className="divider" />
                   <p className="prose">
-                    当前版本验证画布、任务协议与素材流转。真实图片、视频、音频模型接入留待后续开发。监听地址、端口与跨域来源由启动环境变量配置，详见仓库
-                    README。
+                    EXE
+                    启动器负责本机服务进程与数据目录；管理台负责执行端、模型、任务和素材。终端启动后使用日志中的管理台地址，在相同环境和目录运行
+                    npm run credential 获取凭证。关闭管理台不会停止服务。
                   </p>
                 </section>
               )}
@@ -382,14 +450,80 @@ function App() {
         </div>
       )}
       {editor && (
-        <Modal title={editor.id ? "编辑执行端连接" : "接入新执行端"} close={() => { if (!busy) setEditor(null); }}>
-          <p className="prose">填写从 Server 所在机器可访问的 Worker 地址。Server 会主动连接，无需提供公网入口。</p>
-          <form className="worker-connection-form" onSubmit={e => { e.preventDefault(); void submitWorker(false); }}>
-            <label>执行端名称<input value={editor.name} placeholder="可选，默认使用 Worker 名称" onChange={e => setEditor({ ...editor, name: e.target.value })} /></label>
-            <label>Worker 地址<input required type="url" value={editor.address} placeholder="http://127.0.0.1:4320" onChange={e => { setEditor({ ...editor, address: e.target.value }); setProbe(null); }} /></label>
-            <label>接入密钥<input required={!editor.id} type="password" autoComplete="new-password" value={editor.credential} placeholder={editor.id ? "留空保留现有密钥" : "填写 Worker 提供的接入密钥"} onChange={e => { setEditor({ ...editor, credential: e.target.value }); setProbe(null); }} /></label>
-            {probe && <p className="prose" role="status">验证通过：{probe.workerName} · {probe.platform} · 协议 {probe.protocolVersion}</p>}
-            <div className="row"><button type="button" disabled={busy} onClick={() => void submitWorker(true)}>测试连接</button><button className="primary" disabled={busy} type="submit">{busy ? "正在连接…" : "保存连接"}</button></div>
+        <Modal
+          title={editor.id ? "编辑执行端连接" : "接入新执行端"}
+          close={() => {
+            if (!busy) setEditor(null);
+          }}
+        >
+          <p className="prose">
+            优先填写云平台分配的 HTTPS 服务根地址（不要带
+            /management），也可使用局域网地址。该入口须允许 Server 直接访问 HTTP
+            和 WebSocket；平台网页登录保护不能代替 Worker 接入密钥。Server
+            无需公网入口。
+          </p>
+          <form
+            className="worker-connection-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submitWorker(false);
+            }}
+          >
+            <label>
+              执行端名称
+              <input
+                value={editor.name}
+                placeholder="可选，默认使用 Worker 名称"
+                onChange={(e) => setEditor({ ...editor, name: e.target.value })}
+              />
+            </label>
+            <label>
+              Worker 地址
+              <input
+                required
+                type="url"
+                value={editor.address}
+                placeholder="https://云平台分配的服务域名"
+                onChange={(e) => {
+                  setEditor({ ...editor, address: e.target.value });
+                  setProbe(null);
+                }}
+              />
+            </label>
+            <label>
+              接入密钥
+              <input
+                required={!editor.id}
+                type="password"
+                autoComplete="new-password"
+                value={editor.credential}
+                placeholder={
+                  editor.id ? "留空保留现有密钥" : "填写 Worker 提供的接入密钥"
+                }
+                onChange={(e) => {
+                  setEditor({ ...editor, credential: e.target.value });
+                  setProbe(null);
+                }}
+              />
+            </label>
+            {probe && (
+              <p className="prose" role="status">
+                HTTP 校验通过，保存后建立 WebSocket：{probe.workerName} ·{" "}
+                {probe.platform} · 协议 {probe.protocolVersion}
+              </p>
+            )}
+            <div className="row">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void submitWorker(true)}
+              >
+                测试连接
+              </button>
+              <button className="primary" disabled={busy} type="submit">
+                {busy ? "正在连接…" : "保存连接"}
+              </button>
+            </div>
           </form>
         </Modal>
       )}
@@ -477,27 +611,43 @@ function WorkerTable({
                     : w.draining
                       ? "排空中"
                       : w.state === "busy"
-                        ? "忙碌" : w.state === "ready"
-                        ? "在线"
-                        : "离线"}
+                        ? "忙碌"
+                        : w.state === "ready"
+                          ? "在线"
+                          : "离线"}
                 </span>
               </td>
               <td>
                 {w.platform}
-                <small>{w.reason}</small>{w.lastError && <small className="job-error">{w.lastError}</small>}
-                {(w.activeJobs || []).map((j: any) => <small key={j.id}>任务 {j.id.slice(0, 8)} · {j.stage}</small>)}
+                <small>{w.reason}</small>
+                {w.lastError && (
+                  <small className="job-error">{w.lastError}</small>
+                )}
+                {(w.activeJobs || []).map((j: any) => (
+                  <small key={j.id}>
+                    任务 {j.id.slice(0, 8)} · {j.stage}
+                  </small>
+                ))}
                 <small>{w.capabilities.length} 项执行能力</small>
-                {(w.imageProfiles || []).map((p: any) => <small key={p.profileId}>{p.modelId} · {p.profileId.slice(0, 8)} · GPU 待验收</small>)}
+                {(w.imageProfiles || []).map((p: any) => (
+                  <small key={p.profileId}>
+                    {p.modelId} · {p.profileId.slice(0, 8)} · GPU 待验收
+                  </small>
+                ))}
               </td>
               <td>
                 {w.lastHeartbeat
                   ? new Date(w.lastHeartbeat).toLocaleTimeString()
                   : "尚未握手"}
-                {w.heartbeatAgeSeconds !== null && <small>{w.heartbeatAgeSeconds} 秒前</small>}
+                {w.heartbeatAgeSeconds !== null && (
+                  <small>{w.heartbeatAgeSeconds} 秒前</small>
+                )}
               </td>
               <td>
                 <div className="row">
-                  <button className="small" onClick={() => edit(w)}>连接设置</button>
+                  <button className="small" onClick={() => edit(w)}>
+                    连接设置
+                  </button>
                   <button
                     className="small"
                     disabled={w.disabled}
@@ -532,7 +682,9 @@ function JobTable({
   fail: (s: string) => void;
 }) {
   if (!jobs.length)
-    return <Empty text="暂无任务。在 Studio 选择节点，提交创作或媒体处理任务。" />;
+    return (
+      <Empty text="暂无任务。在 Studio 选择节点，提交创作或媒体处理任务。" />
+    );
   return (
     <div className="table-scroll">
       <table>
@@ -550,9 +702,27 @@ function JobTable({
             <tr key={j.id}>
               <td>
                 <strong>
-                  {[...catalog.imageOperations, ...catalog.speechOperations, ...catalog.media].find(op => op.id === j.operation)?.name || (j.operation === "mock.text.echo.v1" ? "文本回显" : j.operation === "mock.media.copy.v1" ? "素材复制" : j.operation)}
+                  {[
+                    ...catalog.imageOperations,
+                    ...catalog.speechOperations,
+                    ...catalog.media,
+                  ].find((op) => op.id === j.operation)?.name ||
+                    (j.operation === "mock.text.echo.v1"
+                      ? "文本回显"
+                      : j.operation === "mock.media.copy.v1"
+                        ? "素材复制"
+                        : j.operation)}
                 </strong>
-                <small>{j.id.slice(0, 8)} · {j.simulation ? "模拟" : j.operation === "audio.speech.v1" ? "GPU 语音" : j.operation.startsWith("image.") ? "GPU 图片" : "CPU 处理"}</small>
+                <small>
+                  {j.id.slice(0, 8)} ·{" "}
+                  {j.simulation
+                    ? "模拟"
+                    : j.operation === "audio.speech.v1"
+                      ? "GPU 语音"
+                      : j.operation.startsWith("image.")
+                        ? "GPU 图片"
+                        : "CPU 处理"}
+                </small>
               </td>
               <td>
                 {projects.find((p) => p.id === j.projectId)?.name ||
@@ -567,7 +737,12 @@ function JobTable({
                   : ""}
                 {j.stage}
                 {j.error && <small className="job-error">{j.error}</small>}
-                {j.workerId && <small>执行端 {j.workerId.slice(0, 8)} · 尝试 {j.attemptId?.slice(0, 8)}</small>}
+                {j.workerId && (
+                  <small>
+                    执行端 {j.workerId.slice(0, 8)} · 尝试{" "}
+                    {j.attemptId?.slice(0, 8)}
+                  </small>
+                )}
               </td>
               <td>
                 {["failed", "interrupted"].includes(j.status) ? (

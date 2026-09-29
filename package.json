@@ -1,6 +1,6 @@
 {
   "name": "zhilume-server",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -13,7 +13,8 @@
     "desktop": "electron .",
     "pack": "npm run build && electron-builder --dir",
     "contracts:export": "node scripts/export-contracts.mjs",
-    "media:sync": "node scripts/sync-media-package.mjs"
+    "media:sync": "node scripts/sync-media-package.mjs",
+    "credential": "node scripts/credential.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.0",

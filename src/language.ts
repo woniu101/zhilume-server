@@ -9,6 +9,7 @@ import { AppError, id, text, terminal } from './domain.js';
 import { fingerprint } from './execution.js';
 import type { Store } from './store.js';
 import type { Assets } from './assets.js';
+import { protocols, providerEndpoint, providerHeaders, providerRequest, providerContent, boundedProviderJson } from './language-protocol.js';
 
 export class LanguageService {
   private key: Buffer;
@@ -37,12 +38,26 @@ export class LanguageService {
     writeFileSync(path + '.tmp', Buffer.concat([nonce, cipher.getAuthTag(), encrypted]), { mode: 0o600 }); renameSync(path + '.tmp', path);
   }
   providers() { return this.store.all('language-provider').map(p => ({ ...p, hasKey: !!this.secrets[p.id] })); }
+  async discover(b: any) {
+    const previous = b.id ? this.store.get('language-provider', b.id) : null;
+    const baseUrl = providerEndpoint(b.baseUrl), protocol = b.protocol || 'chat-completions';
+    if (!protocols.includes(protocol)) throw new AppError('invalid_protocol', '请选择支持的接口协议');
+    const key = (b.apiKey ? text(b.apiKey, 8192) : '') || (previous?.baseUrl === baseUrl && previous?.protocol === protocol ? this.secrets[previous.id] : '');
+    if (!key) throw new AppError('missing_key', '请填写 API Key；更换地址或协议后需重新填写');
+    const start = Date.now();
+    try {
+      const response = await fetch(baseUrl + '/models', { headers: providerHeaders(protocol, key), redirect: 'error', signal: AbortSignal.timeout(15000) });
+      const data = await boundedProviderJson(response, 1000000);
+      if (!Array.isArray(data.data)) throw new AppError('invalid_models', '服务未返回模型列表，请手动填写模型标识');
+      const models = data.data.filter((m: any) => m && typeof m.id === 'string' && m.id.length <= 160).slice(0, 500).map((m: any) => ({ id: m.id, name: String(m.display_name || m.id).slice(0, 160) }));
+      return { models, elapsedMs: Date.now() - start };
+    } catch (e) { if (e instanceof AppError) throw e; throw new AppError('provider_unreachable', '无法获取模型列表，请检查地址和密钥；也可以手动填写模型标识'); }
+  }
   configure(b: any) {
     const previous = b.id ? this.store.get('language-provider', b.id) : null;
-    let url: URL; try { url = new URL(text(b.baseUrl, 2048)); } catch { throw new AppError('invalid_endpoint', '服务地址格式无效'); }
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash ||
-        (url.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))
-      throw new AppError('invalid_endpoint', '服务地址须为 HTTPS（本机测试可用 HTTP），不能包含凭证或查询参数');
+    const baseUrl = providerEndpoint(text(b.baseUrl, 2048)), protocol = b.protocol || 'chat-completions';
+    if (!protocols.includes(protocol)) throw new AppError('invalid_protocol', '请选择支持的接口协议');
+    if (previous && (previous.baseUrl !== baseUrl || previous.protocol !== protocol) && !b.apiKey) throw new AppError('missing_key', '更换地址或协议后请重新填写 API Key');
     if (!Array.isArray(b.models) || !b.models.length || b.models.length > 32) throw new AppError('invalid_models', '请配置 1–32 个模型');
     const providerId = previous?.id || id();
     const models = b.models.map((m: any) => {
@@ -55,14 +70,16 @@ export class LanguageService {
       if (!['json_schema', 'json_object'].includes(model.structuredMode) || !['default', 'none', 'low', 'high'].includes(model.reasoningEffort) || !Number.isInteger(model.maxOutputTokens) || model.maxOutputTokens < 16 || model.maxOutputTokens > 8192) throw new AppError('invalid_options', '结构化协议、思考模式或输出上限无效');
       if (!Number.isInteger(model.maxInputCharacters) || model.maxInputCharacters < 1 || model.maxInputCharacters > 20000 || !Number.isInteger(model.maxImages) || model.maxImages < 0 || model.maxImages > 8)
         throw new AppError('invalid_limits', '输入长度或图片数量无效');
-      return { ...model, profileId: fingerprint({ providerId, protocol: 'chat-completions', baseUrl: url.href.replace(/\/$/, ''), ...model }) };
+      if (protocol === 'anthropic-messages' && !['default', 'none'].includes(model.reasoningEffort)) throw new AppError('invalid_options', 'Messages 接口目前支持默认思考或关闭思考');
+      if (protocol !== 'chat-completions' && capabilities.includes('structured') && model.structuredMode !== 'json_schema') throw new AppError('invalid_options', '此接口的结构化输出需使用 JSON Schema');
+      return { ...model, profileId: fingerprint({ providerId, protocol, baseUrl, ...model }) };
     });
     if (new Set(models.map((m: any) => m.profileId)).size !== models.length) throw new AppError('duplicate_model', '模型规格重复');
     const defaults = b.defaults || {};
     for (const purpose of Object.keys(defaults)) if (!['text', 'general', 'qwen', 'h3'].includes(purpose) || !models.some((m: any) => m.model === defaults[purpose])) throw new AppError('invalid_default', '默认用途必须指向当前服务的模型');
     if (b.apiKey !== undefined && b.apiKey !== '') { this.secrets[providerId] = text(b.apiKey, 8192); this.saveSecrets(); }
     if (!this.secrets[providerId]) throw new AppError('missing_key', '请设置 API Key');
-    const provider = { id: providerId, name: text(b.name, 100), baseUrl: url.href.replace(/\/$/, ''), protocol: 'chat-completions', enabled: b.enabled !== false, models, defaults, concurrency: 1 };
+    const provider = { id: providerId, name: text(b.name, 100), baseUrl, protocol, enabled: b.enabled !== false, models, defaults, concurrency: 1 };
     this.store.atomic(() => {
       // A purpose has one default across all services, without changing execution specs.
       for (const other of this.store.all('language-provider')) if (other.id !== providerId) {
@@ -88,38 +105,35 @@ export class LanguageService {
     for (const j of this.store.all('job').reverse().filter(j => j.executor === 'api' && j.status === 'queued')) {
       const spec = this.store.get('language-spec', j.input.profileId), provider = spec && this.store.get('language-provider', spec.providerId);
       if (!provider?.enabled || !this.secrets[provider.id]) { if (j.waitReason !== 'model_offline') this.changed(Object.assign(j, { waitReason: 'model_offline', stage: '语言模型服务已停用' })); continue; }
+      if (spec.baseUrl !== provider.baseUrl || spec.protocol !== provider.protocol) {
+        if (j.waitReason !== 'configuration_changed') this.changed(Object.assign(j, { waitReason: 'configuration_changed', stage: '服务连接配置已改变，请取消后重新提交' }));
+        continue;
+      }
       if (this.active.size >= 2 || [...this.active.keys()].some(k => this.store.get('job', k)?.providerId === provider.id)) {
         if (j.waitReason !== 'resource_busy') this.changed(Object.assign(j, { waitReason: 'resource_busy', stage: '等待互联网模型队列' })); continue;
       }
       const abort = new AbortController();
       Object.assign(j, { status: 'running', stage: '语言模型处理中', waitReason: null, providerId: provider.id }); this.changed(j);
-      const done = this.run(j, spec, abort).finally(() => { this.active.delete(j.id); this.pump(); });
+      const done = this.run(j, spec, abort, this.secrets[provider.id]).finally(() => { this.active.delete(j.id); this.pump(); });
       this.active.set(j.id, { abort, done });
     }
   }
-  private async run(job: any, spec: any, abort: AbortController) {
+  private async run(job: any, spec: any, abort: AbortController, apiKey: string) {
     const timer = setTimeout(() => abort.abort(new Error('timeout')), 120000);
     try {
-      const input = job.input, parts: any[] = [{ type: 'text', text: input.text }];
+      const input = job.input, images: { mime: string; data: string }[] = [];
       for (const assetId of input.referenceAssetIds) {
         const asset = this.store.get('asset', assetId), bytes = await readFile(this.assets.path(asset));
-        parts.push({ type: 'image_url', image_url: { url: `data:${asset.mimeType};base64,${bytes.toString('base64')}` } });
+        images.push({ mime: asset.mimeType, data: bytes.toString('base64') });
       }
-      const response = await fetch(spec.baseUrl + '/chat/completions', {
+      const request = providerRequest(spec, input, images);
+      const response = await fetch(spec.baseUrl + request.path, {
         method: 'POST', redirect: 'error', signal: abort.signal,
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + this.secrets[spec.providerId] },
-        body: JSON.stringify({ model: spec.model, stream: false, max_tokens: spec.maxOutputTokens, ...(spec.reasoningEffort !== 'default' ? { reasoning_effort: spec.reasoningEffort } : {}), messages: [
-          { role: 'system', content: input.systemPrompt },
-          { role: 'user', content: parts.length === 1 ? input.text : parts },
-        ], ...(input.schema ? { response_format: spec.structuredMode === 'json_object' ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: 'result', strict: true, schema: input.schema } } } : {}) }),
+        headers: providerHeaders(spec.protocol, apiKey),
+        body: JSON.stringify(request.body),
       });
-      if (!response.ok) throw new AppError('provider_error', `语言模型服务返回 HTTP ${response.status}`);
-      // Bound provider output before parsing; never persist raw error responses or headers.
-      let raw = ''; const decoder = new TextDecoder();
-      for await (const chunk of response.body as any) { raw += decoder.decode(chunk, { stream: true }); if (raw.length > 256000) { abort.abort(); throw new AppError('output_too_large', '语言模型响应过大'); } }
-      raw += decoder.decode(); const result = JSON.parse(raw);
-      const content = validateLanguageOutput(result.choices?.[0]?.message?.content, input.schema);
-      if (result.choices?.[0]?.finish_reason !== 'stop') throw new AppError('incomplete_output', '语言模型未完整输出，请调整输入后重试');
+      const result = await boundedProviderJson(response);
+      const content = validateLanguageOutput(providerContent(spec.protocol, result), input.schema);
       const asset = await this.assets.ingest(Readable.from([Buffer.from(content)]), '语言模型结果.txt', { staged: true, jobId: job.id, attemptId: job.attemptId });
       const current = this.store.get('job', job.id);
       if (abort.signal.aborted || current.status === 'cancel_requested') throw new Error('cancelled');

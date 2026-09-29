@@ -516,6 +516,7 @@ export async function createApp(options: Options) {
   }
   app.get('/api/v1/language/providers', async req => { owner(req); return language.providers(); });
   app.post('/api/v1/language/providers', async (req: any) => { owner(req); return language.configure(req.body); });
+  app.post('/api/v1/language/providers/discover', async (req: any) => { owner(req); return language.discover(req.body); });
   app.get('/api/v1/language/models', async req => { owner(req); return [...language.models(), ...workerLanguageModels(knownWorkers())]; });
   app.get('/api/v1/models', async req => { owner(req); return { image: modelAvailability(knownWorkers()), speech: speechAvailability(knownWorkers()), video: videoAvailability(knownWorkers()), language: [...language.models(), ...workerLanguageModels(knownWorkers())] }; });
   app.post('/api/v1/jobs', async (req: any, reply) => {
@@ -673,6 +674,8 @@ export async function createApp(options: Options) {
         ["running", "assigned", "cancel_requested"].includes(j.status),
       ).length,
       dataDirectory: options.root,
+      assetsDirectory: join(options.root, 'assets'),
+      tokenFile: options.token ? null : tokenPath,
     };
   });
   app.post("/api/v1/events/ticket", async (req) => {

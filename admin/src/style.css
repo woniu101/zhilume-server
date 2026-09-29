@@ -312,4 +312,39 @@ td small {
 .worker-connection-form label { display: grid; gap: 8px; }
 .worker-connection-form input { width: 100%; }
 
-.provider-form { display:grid;gap:12px;max-width:760px; }.provider-form label { display:flex;align-items:center;gap:10px; }.provider-form label input:not([type=checkbox]) { flex:1; }
+.language-page { display:grid;gap:22px; }
+.language-page h2 { display:flex;align-items:center;gap:8px; }
+.language-page h3 { margin:0 0 8px;font-size:16px; }
+.card-heading p { margin:8px 0 0;font-size:13px; }
+.spread { justify-content:space-between; }.wrap { flex-wrap:wrap; }
+.provider-empty { padding:44px 24px;text-align:center;color:var(--muted); }
+.provider-empty h3 { color:var(--text);margin:16px 0 8px; }
+.provider-list { padding:18px 24px;display:grid;gap:14px; }
+.provider-card { border:1px solid var(--border);border-radius:10px;padding:18px; }
+.provider-card p { font-size:13px;margin:12px 0 0; }
+.endpoint-label { overflow-wrap:anywhere; }
+.model-chips { display:flex;flex-wrap:wrap;gap:8px;margin-top:14px; }
+.provider-backdrop { position:fixed;inset:0;background:#0008;z-index:1000;display:grid;place-items:center;padding:24px; }
+.provider-dialog { width:min(1060px,100%);height:min(820px,calc(100dvh - 48px));display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden; }
+.provider-dialog-header { padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:14px; }
+.provider-dialog h2 { margin:0 0 6px;font-size:20px; }.provider-dialog .muted { font-size:13px; }
+.provider-dialog-body { min-height:0;flex:1;display:flex; }
+.provider-presets { width:235px;flex-shrink:0;background:var(--bg);border-right:1px solid var(--border);overflow-y:auto;padding:18px 12px; }
+.provider-presets>div>small { display:block;color:var(--muted);margin:8px 10px; }
+.provider-presets button { display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:11px 12px;margin:4px 0;border-color:transparent;text-align:left;white-space:normal;background:transparent;gap:4px;font-size:14px; }
+.provider-presets button small { color:var(--muted);font-size:11px; }.provider-presets button.active { background:var(--tint);border-color:var(--accent);color:var(--accent); }
+.provider-editor { flex:1;min-width:0;overflow-y:auto;padding:24px; }
+.provider-editor fieldset { border:0;margin:0;padding:0;min-width:0; }
+.field-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px; }
+.field-grid label { margin:0;display:grid;gap:7px;align-content:start; }.field-grid label input,.field-grid label select { margin:0;min-width:0; }
+.field-grid small { font-size:12px;line-height:1.5; }.span-two { grid-column:1/-1; }
+.provider-editor>.row,.provider-editor fieldset>.row { margin-top:16px; }
+.section-label { margin-top:24px!important; }.model-editor { padding:16px;border:1px solid var(--border);border-radius:10px;margin:12px 0; }
+.check-label { display:inline-flex;align-items:center;gap:7px;margin:12px 0;font-size:13px;white-space:nowrap; }
+.check-label input { width:16px;height:16px;margin:0;accent-color:var(--accent); }
+.model-editor summary { cursor:pointer;color:var(--muted);font-size:13px;padding:8px 0; }.model-editor details[open] .field-grid { padding-top:12px; }
+.provider-notice { padding:10px 12px;border-radius:8px;background:var(--tint);font-size:13px; }
+.provider-dialog-footer { padding:14px 24px;border-top:1px solid var(--border);background:var(--panel); }.provider-dialog-footer .row { justify-content:flex-end; }.provider-dialog-footer .error { margin:0 0 12px; }
+.storage-location { padding:18px 24px;border-bottom:1px solid var(--border);background:var(--tint); }.storage-location code { display:block;margin:8px 0;overflow-wrap:anywhere; }
+.asset-preview { width:100%;max-height:55vh;object-fit:contain; }.asset-text { white-space:pre-wrap;max-height:55vh;overflow:auto; }
+@media(max-width:780px){.provider-backdrop{padding:8px}.provider-dialog{height:calc(100dvh - 16px)}.provider-presets{width:175px}.provider-editor{padding:16px}.field-grid{grid-template-columns:1fr}.provider-presets button{font-size:12px}.provider-list{padding:14px}.provider-dialog-header{padding:16px}}
