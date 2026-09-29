@@ -123,8 +123,9 @@ export function validateCanvas(doc: any) {
     if (node.data.videoDraft !== undefined) validateVideoDraft(node.data.videoDraft);
     if (node.data.speechDraft !== undefined) validateSpeechDraft(node.data.speechDraft);
     if (node.data.generationDraft !== undefined) validateGenerationDraft(node.data.generationDraft);
-    if (node.data.textDraft !== undefined && (typeof node.data.textDraft !== "string" || node.data.textDraft.length > 12000))
-      throw new AppError("invalid_node_content", "文本草稿超过允许长度");
+    for (const field of ["textDraft", "textEditDraft"])
+      if (node.data[field] !== undefined && (typeof node.data[field] !== "string" || node.data[field].length > 12000))
+        throw new AppError("invalid_node_content", "文本草稿超过允许长度");
     nodeIds.add(node.id);
   }
   const children = new Map<string, string[]>();

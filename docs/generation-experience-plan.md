@@ -1,6 +1,6 @@
 # 节点生成与结果版本规范（2026-09-29）
 
-本轮直接重构初版的节点结果归属，不迁移旧开发版本自动创建的结果节点。Studio 0.15.0 与 Server 0.13.0 配套使用；Worker 执行协议仍为 3.0。
+本轮直接重构初版的节点结果归属，不迁移旧开发版本自动创建的结果节点。Studio 0.16.0 与 Server 0.13.2 配套使用；Worker 执行协议仍为 3.0。
 
 ## 创作操作
 
@@ -24,7 +24,7 @@
 ## 数据职责
 
 - 当前内容：kind、assetId / text / html、contentRevision、contentSchemaVersion=1。
-- 创作草稿：generationDraft / videoDraft / speechDraft / textDraft；languageSelection 保存语言规格、Worker 及幂等请求。
+- 创作草稿：generationDraft / videoDraft / speechDraft / textDraft（生成要求）/ textEditDraft（未保存正文）；languageSelection 保存语言规格、Worker 及幂等请求。
 - 任务：Server 校验并冻结参数、素材、执行规格、目标节点和提交时内容快照。草稿编辑不改变已提交任务。
 - 结果：归档成功时持久化 NodeResult v1。Server、互联网 API、Worker 任务使用相同归档入口；本地媒体处理同步素材后走同一 Studio 结果 reducer。
 - 版本：节点保存 versions；receivedResultIds 确保幂等采用。结果只有在类型及提交时内容快照仍一致时自动采用，否则只进入历史。参数草稿的修改不阻止当前结果采用。
@@ -38,3 +38,5 @@
 图片基础处理仍在 Studio；视频截取与提取音轨 Web 走 Server FFmpeg 单并发，Electron 走主进程内置 FFmpeg；AI 仍由已声明的 Worker 或语言 API 执行。未增加 GPU 调度、网络组网或积分机制。
 
 本轮验收记录见 [节点创作验收](node-generation-acceptance-2026-09-29.md)。代码和界面测试与真实模型画质／性能验收分别记录。
+
+编辑区布局规范见 PRD 第 46 节。textDraft 与 textEditDraft 分别校验可选字符串及 12000 字符上限；正文保存后清除 textEditDraft，生成要求继续保留。正文草稿不参与生成任务参数。

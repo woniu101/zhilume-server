@@ -25,3 +25,15 @@ test("worker diagnostics distinguish busy, draining, disabled and stale connecti
   assert.equal(workerStatus({ ...worker, disabled: true }, [job], now).state, "disabled");
   assert.equal(workerStatus(worker, [], now + 40000).state, "offline");
 });
+
+
+test("text body edit drafts and generation prompts are independently bounded", () => {
+  const document = (data: Record<string, unknown>) => ({ schemaVersion: 1, nodes: [{ id: "text", type: "media", position: { x: 0, y: 0 }, data: { kind: "text", title: "文本", text: "已保存正文", ...data } }], edges: [] });
+  assert.doesNotThrow(() => validateCanvas(document({ textDraft: "生成要求", textEditDraft: "待保存正文" })));
+  for (const key of ["textDraft", "textEditDraft"]) {
+    assert.doesNotThrow(() => validateCanvas(document({ [key]: "" })));
+    assert.doesNotThrow(() => validateCanvas(document({ [key]: "x".repeat(12000) })));
+    assert.throws(() => validateCanvas(document({ [key]: "x".repeat(12001) })), /草稿/);
+    assert.throws(() => validateCanvas(document({ [key]: 123 })), /草稿/);
+  }
+});
