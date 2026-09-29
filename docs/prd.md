@@ -1019,7 +1019,7 @@ M1／M2 完成不依赖 Worker；M3 可使用固定测试媒体。M4 在有合�
 
 - 语言模型采用服务商预设、服务卡片、多模型编辑及独立默认用途；参数分层展示，统一深浅主题。新增 Responses 与 Messages 原生适配，保留 Chat Completions。模型目录获取不视为推理验收。
 - 密钥只在 Server 端管理。地址或协议变化需重填密钥，旧连接的排队任务禁止使用新凭证访问旧地址。API 模型仍使用独立队列。
-- EXE 启动成功自动打开管理台；终端输出管理台地址和凭证来源，显式 credential 命令可读凭证。连接标签明确是 Server 连通性。
+- EXE 启动按钮只启动服务，管理台由用户按需打开；终端输出管理台地址和凭证来源，显式 credential 命令可读凭证。连接标签明确是 Server 连通性。
 - 素材页提供真实存储目录、搜索筛选和预览；本机 EXE 可打开固定素材目录。服务设置提供脱敏诊断下载。
 - 云 Worker 优先平台原生域名/端口，需验证 HTTP 与 WebSocket；不增加隧道或组网功能。
 - 三端标题采用 Zhilume 产品名 · 页面用途 · 织镜，Studio 主窗口省略冗余用途。Studio/Server 最新 EXE 固定在各自 release/win-unpacked。详细接口与说明见 docs/admin-quickstart.md。

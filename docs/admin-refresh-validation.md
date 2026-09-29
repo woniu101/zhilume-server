@@ -7,3 +7,7 @@
 - Worker：管理页 TypeScript、Vite 构建通过，浏览器标题统一；未部署到云实例。
 - 最新可运行包位于各自 release/win-unpacked，程序包内版本已读取核对。旧 language-* / win-unpacked.tmp 目录移到 Server artifacts/obsolete-builds、Studio .test-data/obsolete-builds，可恢复且不混入 release。
 - 未执行云平台实例启动、真实 GPU 推理、付费 API 推理或网络组网。云平台分配地址的可达性仍需在用户选择的运行实例上同时验证 HTTP、WebSocket。
+
+## 启动行为调整（2026-09-29）
+
+按用户反馈恢复启动与管理台分离：按钮为“启动 Server”，就绪后不主动弹出管理台；“打开管理台”仍自动登录。上述自动弹窗记录属于调整前验收。调整后重新构建发布包，保留模型、存储、标题等其余改进。

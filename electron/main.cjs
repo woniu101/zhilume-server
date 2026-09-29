@@ -163,7 +163,6 @@ async function start() {
       if (response.ok) {
         ready = true;
         record("Server 已就绪，管理台 " + address() + "/admin/");
-        try { await openAdmin(); } catch (e) { record("管理台打开失败：" + e.message); }
         break;
       }
     } catch {}
