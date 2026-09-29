@@ -1,3 +1,4 @@
+const { installEditMenu } = require('./edit-menu.cjs');
 const {
   app,
   BrowserWindow,
@@ -246,6 +247,7 @@ async function handleLauncherClose() {
   } catch (error) { record(error.message); }
   finally { closePromptOpen = false; }
 }
+app.on('browser-window-created', (_event, target) => installEditMenu(target));
 app.whenReady().then(() => {
   app.setAppUserModelId("app.zhilume.server");
   const onlyLauncher =

@@ -1,5 +1,9 @@
 # 开发与验收记录
 
+## 浮动参数面板与原生编辑菜单
+
+2026-09-29：Studio 0.15.1 / Server 0.13.1。统一参数、参考、优化建议与历史浮层；修正编辑区滚动和节点工具栏遮挡；Studio、Server EXE 增加系统右键文本编辑菜单。Worker 未修改，协议不变。PRD v0.34；详细证据与边界见 [交互验收](editor-overlays-acceptance-2026-09-29.md)。
+
 ## 节点原位生成与创作面板 0.15
 
 2026-09-29：当前 Studio 0.15.0 / Server 0.13.0，Worker 未修改。已完成节点内容/历史与任务结果账本重构、空节点类型切换、紧凑编辑区及深浅主题下拉框；PRD v0.33、NodeResult v1，Worker 协议仍为 3.0。浏览器与 Windows EXE 验收、真实 FFmpeg 输出证据及 GPU 验证边界见 [本轮验收](node-generation-acceptance-2026-09-29.md)。以下为历史阶段记录。
