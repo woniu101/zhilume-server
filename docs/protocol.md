@@ -150,3 +150,28 @@ FastAPI 同端口提供 `/management` 静态页面及 `/management/api/*`。所�
 ## 语言模型规格
 
 执行规格种类新增 `language`，与图片/语音/视频共用 GPU 调度和任务文件传输；互联网模型仍走独立 API 队列。输入冻结规则与输出 TXT 校验见 [语言执行协议](language-execution.md)。
+
+
+## 节点结果协议 v1（Server 0.13 / Studio 0.15）
+
+`POST /jobs` 与 `/job-groups` 中的 nodeId 是输出目标节点，必须已保存且类型匹配。Server 从当前画布生成 resultTarget，不信任客户端注入的目标快照；同节点仅一个非终态任务（独立提示词优化除外）。重试保持原冻结输入，但再次检查节点是否存在、类型及并发锁。
+
+```ts
+type ContentSnapshot = {
+  kind: 'text'|'image'|'video'|'audio'; revision: number;
+  assetId?: string; text?: string; html?: string;
+};
+type NodeResult = {
+  version: 1; id: string; jobId: string; projectId: string; nodeId: string;
+  base: ContentSnapshot; operation: string; createdAt: string;
+  outputAssetId: string; output: PublicAsset & {text?: string};
+};
+```
+
+归档与任务成功在原事务中保存唯一 `node-result`（id=jobId）。重复完成不会追加记录；失败、取消、未归档输出不发布结果。`GET /api/v1/projects/:id/node-results` 需访问凭证，按归档顺序返回；签名素材 URL 在读取时生成，文字结果附正文。项目关闭和 Server 重启不丢失账本。
+
+画布仍使用 schemaVersion=1，内容子结构 contentSchemaVersion=1。新增 contentRevision、versions、receivedResultIds、titleSource 和 languageSelection。versions 每节点最多 1000 项，画布仍受整体请求体限制；超限返回明确错误，不静默裁掉历史。版本与确认集合通过画布 baseRevision 乐观锁持久化。未知 contentSchemaVersion 拒绝保存，不推测转换。
+
+Studio 的本地媒体结果使用独立 result id，不伪造 Server jobId；结果 reducer 与后台任务共用。新结果只在 base 与当前内容完全一致时采用；用户编辑过内容时保留在历史。常规草稿变化不增加 contentRevision，替换内容／恢复版本／撤销会推进 revision。
+
+Worker 不管理项目和节点，也不接收这些 UI 版本字段。Worker 3.0 信封、执行规格身份和三类独立队列不变。

@@ -1,3 +1,4 @@
+import { resultTarget, archiveNodeResult } from './node-results.js';
 import { workerLanguageModels, validateWorkerLanguage, validateLanguageProfiles } from './worker-language.js';
 import { validateLanguageOutput } from './language-request.js';
 import { LanguageService, languageOperations } from './language.js';
@@ -115,6 +116,7 @@ export async function createApp(options: Options) {
   const saveJob = (job: any) => {
     job.updatedAt = now();
     store.put("job", job);
+    archiveNodeResult(store, job);
     emit("job.changed", { id: job.id });
     return job;
   };
@@ -249,6 +251,13 @@ export async function createApp(options: Options) {
     p.updatedAt = now();
     return store.put("project", p);
   });
+  app.get('/api/v1/projects/:id/node-results', async (req: any) => {
+    owner(req); getProject(req.params.id);
+    return store.all('node-result').filter(r => r.projectId === req.params.id).reverse().map(r => {
+      const a = requireValue(store.get('asset', r.outputAssetId));
+      return { ...r, output: { ...publicAsset(a), ...(a.kind === 'text' ? { text: readFileSync(assets.path(a), 'utf8') } : {}) } };
+    });
+  });
   app.get("/api/v1/projects/:id/canvas", async (req: any) => {
     owner(req);
     getProject(req.params.id);
@@ -273,6 +282,15 @@ export async function createApp(options: Options) {
           "画布已在其他窗口修改，本地草稿已保留",
           409,
         );
+      for (const node of body.nodes) {
+        const previous = old.nodes.find((n:any) => n.id === node.id);
+        if (!previous || previous.data.kind === node.data.kind) continue;
+        const d = previous.data;
+        if (d.assetId || d.text?.trim() || d.html || d.versions?.length ||
+            old.edges.some((e:any) => e.source === node.id || e.target === node.id) ||
+            store.all('job').some(j => j.projectId === project.id && j.nodeId === node.id && (j.status === 'succeeded' || !terminal.has(j.status))))
+          throw new AppError('node_kind_locked', '已有内容、连接或正在执行的节点不能改变内容类型', 409);
+      }
       const doc = {
         id: project.id,
         schemaVersion: 1,
@@ -510,6 +528,7 @@ export async function createApp(options: Options) {
     if (executor === 'server' && !mediaQueue.ready) throw new AppError('ffmpeg_unavailable', 'Server 内置 FFmpeg 不可用', 503);
     const assetIds = [...new Set([...(input.referenceAssetIds || []), ...(input.assetId ? [input.assetId] : [])])];
     return { id: id(), requestId: text(b.requestId, 100), fingerprint: taskFingerprint(b), projectId: project.id, nodeId: b.nodeId || null,
+      resultTarget: resultTarget(store.get('canvas', project.id)?.nodes.find((n: any) => n.id === b.nodeId), b.operation),
       operation: b.operation, executor, targetWorkerId, input: structuredClone(input), frozenAssets: assetIds.map(a => store.get('asset', a)).filter(Boolean).map(a => ({ id: a.id, sha256: a.sha256, size: a.size })),
       status: 'queued', stage: '等待分配', waitReason: 'resource_busy', progress: null, simulation: b.operation.startsWith('mock.'), attemptId: id(), leaseId: null, workerId: null, sequence: 0, attempts: [], createdAt: now(), updatedAt: now(), sourceRevision: store.get('canvas', project.id)?.revision,
       outputAssetId: null, error: null, errorCode: null, ...extra };
@@ -598,6 +617,13 @@ export async function createApp(options: Options) {
     getProject(j.projectId, true);
     if (!["failed", "interrupted", "blocked", "cancelled"].includes(j.status))
       throw new AppError("retry_not_allowed", "仅失败或中断任务可以重试", 409);
+    if (j.nodeId) {
+      const node = store.get('canvas', j.projectId)?.nodes.find((n:any) => n.id === j.nodeId);
+      if (!node) throw new AppError('node_missing', '目标节点已删除，请在新节点提交任务', 409);
+      resultTarget(node, j.operation);
+      if (store.all('job').some(other => other.id !== j.id && other.projectId === j.projectId && other.nodeId === j.nodeId && other.operation !== 'prompt.optimize.v1' && !terminal.has(other.status)))
+        throw new AppError('node_busy', '目标节点已有执行中的任务', 409);
+    }
     if (!j.bindings?.length) normalize(j.operation, j.input);
     j.attempts.push({
       attemptId: j.attemptId,

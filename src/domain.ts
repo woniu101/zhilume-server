@@ -86,6 +86,40 @@ export function validateCanvas(doc: any) {
         (typeof node.data.text !== "string" || node.data.text.length > 12000))
     )
       throw new AppError("invalid_node_content", "节点标题或文本超过允许长度");
+    const data = node.data;
+    if (data.languageSelection !== undefined) {
+      const d = data.languageSelection, string = (v:unknown,n:number) => typeof v === 'string' && v.length <= n;
+      if (!d || !string(d.profileId,100) || !string(d.targetWorkerId,100) ||
+          (d.request !== undefined && (!string(d.request?.id,100) || !string(d.request?.fingerprint,32000))))
+        throw new AppError('invalid_language_selection', '语言模型选择或请求记录不合法');
+    }
+
+    if (data.contentSchemaVersion !== undefined && data.contentSchemaVersion !== 1)
+      throw new AppError('unsupported_content_version', '不支持的节点内容版本');
+    if (data.contentRevision !== undefined && (!Number.isSafeInteger(data.contentRevision) || data.contentRevision < 0))
+      throw new AppError('invalid_content_revision', '内容版本号不合法');
+    if (data.titleSource !== undefined && !['automatic', 'custom'].includes(data.titleSource))
+      throw new AppError('invalid_node_content', '节点名称来源不合法');
+    if (data.versions !== undefined) {
+      if (!Array.isArray(data.versions) || data.versions.length > 1000) throw new AppError('invalid_versions', '节点历史最多 1000 个版本');
+      const ids = new Set();
+      for (const v of data.versions) {
+        if (!v || typeof v.id !== 'string' || !v.id || v.id.length > 100 || ids.has(v.id) ||
+            !['text','image','video','audio'].includes(v.kind) || !Number.isSafeInteger(v.revision) || v.revision < 0 ||
+            typeof v.createdAt !== 'string' || !Number.isFinite(Date.parse(v.createdAt)) ||
+            typeof v.operation !== 'string' || v.operation.length > 100 ||
+            (v.assetId !== undefined && (typeof v.assetId !== 'string' || v.assetId.length > 100)) ||
+            (v.text !== undefined && (typeof v.text !== 'string' || v.text.length > 12000)) ||
+            (v.html !== undefined && (typeof v.html !== 'string' || v.html.length > 100000)))
+          throw new AppError('invalid_versions', '节点历史结构不合法');
+        ids.add(v.id);
+      }
+    }
+    if (data.receivedResultIds !== undefined && (!Array.isArray(data.receivedResultIds) || data.receivedResultIds.length > 10000 || data.receivedResultIds.some((v:any) => typeof v !== 'string' || v.length > 100)))
+      throw new AppError('invalid_results', '节点结果确认记录不合法');
+    for (const draft of [data.generationDraft, data.speechDraft, data.videoDraft])
+      if (draft?.targetWorkerId !== undefined && (typeof draft.targetWorkerId !== 'string' || draft.targetWorkerId.length > 100))
+        throw new AppError('invalid_target', '执行端选择不合法');
     if (node.data.videoDraft !== undefined) validateVideoDraft(node.data.videoDraft);
     if (node.data.speechDraft !== undefined) validateSpeechDraft(node.data.speechDraft);
     if (node.data.generationDraft !== undefined) validateGenerationDraft(node.data.generationDraft);

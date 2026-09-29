@@ -1,5 +1,9 @@
 # 开发与验收记录
 
+## 节点原位生成与创作面板 0.15
+
+2026-09-29：当前 Studio 0.15.0 / Server 0.13.0，Worker 未修改。已完成节点内容/历史与任务结果账本重构、空节点类型切换、紧凑编辑区及深浅主题下拉框；PRD v0.33、NodeResult v1，Worker 协议仍为 3.0。浏览器与 Windows EXE 验收、真实 FFmpeg 输出证据及 GPU 验证边界见 [本轮验收](node-generation-acceptance-2026-09-29.md)。以下为历史阶段记录。
+
 ## Worker 通用部署 0.10
 
 新增统一 Linux 发布安装/升级/回退、托管 ComfyUI 进程及共享服务管理界面。PRD v0.25；Studio/Server 产品版本和任务协议不变。CPU 发布与管理验收见 [部署验收](worker-portable-acceptance-2026-09-27.md)。真实 GPU 托管、其他云、自有机器与完整 CUDA 安装仍待验收；语言模型执行器继续作为下一阶段。
