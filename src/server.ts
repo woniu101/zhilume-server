@@ -9,7 +9,7 @@ import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import staticFiles from "@fastify/static";
 import { Ajv } from "ajv";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { createReadStream, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -184,10 +184,12 @@ export async function createApp(options: Options) {
           : "服务暂时无法完成请求",
     });
   });
+  const identity = store.get("system", "identity") || store.put("system", { id: "identity", serverId: randomUUID() });
   app.get("/api/v1/system", async () => ({
+    serverId: identity.serverId,
     name: "Zhilume Server",
     version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version,
-    protocolVersion: "3.0",
+    protocolVersion: "3.1",
     authentication: true,
   }));
   const loginAttempts = new Map<string, { count: number; until: number }>();
@@ -203,9 +205,27 @@ export async function createApp(options: Options) {
       throw new AppError("invalid_credential", "访问凭证不正确", 401);
     }
     loginAttempts.delete(req.ip);
-    const token = randomBytes(32).toString("base64url");
-    store.put("session", { id: digest(token), expires: Date.now() + 86400000 });
-    return { token, expiresIn: 86400 };
+    return issueSession();
+  });
+  function issueSession() {
+    const token = randomBytes(32).toString("base64url"), refreshToken = randomBytes(32).toString("base64url");
+    const expiresAt = Date.now() + 86400000;
+    store.put("session", { id: digest(token), expires: expiresAt });
+    store.put("device-session", { id: digest(refreshToken), accessId: digest(token), expires: Date.now() + 30 * 86400000 });
+    return { token, refreshToken, expiresAt, expiresIn: 86400, serverId: identity.serverId };
+  }
+  app.get("/api/v1/session/status", async (req) => { owner(req); return { serverId: identity.serverId }; });
+  app.post("/api/v1/session/renew", async (req: any) => store.atomic(() => {
+    const id = digest(String(req.body?.refreshToken || "")), session = store.get("device-session", id);
+    if (!session || session.expires <= Date.now()) throw new AppError("unauthorized", "设备授权已失效，请重新验证", 401);
+    store.remove("device-session", id);
+    store.remove("session", session.accessId);
+    return issueSession();
+  }));
+  app.post("/api/v1/session/revoke", async (req: any) => {
+    const id = digest(String(req.body?.refreshToken || "")), session = store.get("device-session", id);
+    if (session) { store.remove("device-session", id); store.remove("session", session.accessId); }
+    return { revoked: true };
   });
   app.get("/api/v1/projects", async (req) => {
     owner(req);

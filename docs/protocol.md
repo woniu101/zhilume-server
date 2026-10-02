@@ -175,3 +175,15 @@ type NodeResult = {
 Studio 的本地媒体结果使用独立 result id，不伪造 Server jobId；结果 reducer 与后台任务共用。新结果只在 base 与当前内容完全一致时采用；用户编辑过内容时保留在历史。常规草稿变化不增加 contentRevision，替换内容／恢复版本／撤销会推进 revision。
 
 Worker 不管理项目和节点，也不接收这些 UI 版本字段。Worker 3.0 信封、执行规格身份和三类独立队列不变。
+
+## Studio 连接控制接口 3.1（2026-10-02）
+
+Worker 协议仍为 3.0，以下版本只用于 Studio 对 Server 的控制连接。
+
+- `GET /api/v1/system`：公开返回 serverId、产品版本、protocolVersion=3.1。serverId 在当前数据目录内稳定。
+- `POST /api/v1/session`：使用访问凭证交换 token、refreshToken、expiresAt、expiresIn、serverId。访问会话有效 24 小时，设备续期授权有效 30 天。
+- `GET /api/v1/session/status`：验证 Bearer 会话并返回 serverId，不依赖 Worker 在线状态。
+- `POST /api/v1/session/renew`：提交 refreshToken；在数据库事务中删除旧访问/续期授权，签发新的一对。旧续期授权不可重放。
+- `POST /api/v1/session/revoke`：提交 refreshToken，撤销该设备续期授权及关联访问会话。重复撤销返回成功。
+
+会话密钥不可放入 URL 或日志；Studio 桌面端通过 OS 加密保存，浏览器端仅在标签会话中保存。离线忘记连接只能移除本机保存信息，远端授权在可访问时撤销或自然过期。
