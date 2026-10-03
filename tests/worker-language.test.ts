@@ -1,3 +1,4 @@
+import { createResultNode, assertNodeResult } from './result-helper.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -17,15 +18,16 @@ test('language Workers: exact-spec aggregation, GPU routing, parallel, FIFO, fre
   const models=await wait('/language/models',v=>v[0]?.readyCount===2),profile=models[0];
   assert.equal(models.length,1);assert.equal(profile.executor,'worker');
   const project=await call('/projects',{name:'LLM transport fixture'});
+  await createResultNode(app,{authorization:'Bearer test-only'},project.id,'text');
   const body=(text:string)=>({requestId:crypto.randomUUID(),projectId:project.id,operation:'text.generate.v1',input:{profileId:profile.profileId,text}});
-  const first=body('hold'), a=await call('/jobs',first), b=await call('/jobs',body('hold')), c=await call('/jobs',body('original'));
+  const first=body('hold'), a=await call('/jobs',first), b=await call('/jobs',body('hold')), c=await call('/jobs',{...body('original'),nodeId:'result-target'});
   assert.equal(a.executor,'worker');assert.equal((await call('/jobs',first)).id,a.id);
   first.input.text='edited';
   const running=await wait('/jobs',v=>v.filter((j:any)=>j.status==='running').length===2);
   assert.equal(new Set(running.filter((j:any)=>j.status==='running').map((j:any)=>j.workerId)).size,2);
   assert.equal((await call('/jobs/'+c.id)).status,'queued');
   await call('/jobs/'+a.id+'/cancel',{});await wait('/jobs/'+a.id,j=>j.status==='cancelled');
-  const done=await wait('/jobs/'+c.id,j=>j.status==='succeeded');assert.equal(done.outputText,'result: original');assert.ok(done.outputAssetId);
+  const done=await wait('/jobs/'+c.id,j=>j.status==='succeeded');assert.equal(done.outputText,'result: original');assert.ok(done.outputAssetId);await assertNodeResult(app,{authorization:'Bearer test-only'},project.id,done,'text');
   await call('/jobs/'+b.id+'/cancel',{});await wait('/jobs/'+b.id,j=>j.status==='cancelled');
   const flow=await call('/job-groups',{requestId:crypto.randomUUID(),projectId:project.id,mode:'workflow',tasks:[
     {key:'up',operation:'text.generate.v1',input:{profileId:profile.profileId,text:'fail'}},

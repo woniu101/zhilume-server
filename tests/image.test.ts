@@ -1,3 +1,4 @@
+import { createResultNode, assertNodeResult } from './result-helper.js';
 import { fingerprint } from '../src/execution.js';
 function signed(p: any) { const { profileId, ...spec } = p; spec.identity ||= { revision: 'fixture-v1', quantization: 'fp32', artifacts: { model: 'revision:fixture-v1' } }; return { ...spec, profileId: fingerprint(spec) }; }
 import { startWorker, stopWorker } from "./worker-helper.js";
@@ -94,6 +95,7 @@ test('real Python worker against local fake Comfy: text generation, ordered mult
   const models = await wait(() => call('/image-models'), v => v.every((m: any) => m.ready));
   assert.equal(graphs.length, 0, 'readiness must never submit inference');
   const project = await call('/projects', { name: 'CPU-only fake Comfy acceptance' });
+  await createResultNode(app,headers,project.id,'image');
   const assets = [];
   for (const name of ['first.png', 'second.png']) {
     const res = await app.inject({ method: 'POST', url: '/api/v1/assets/uploads?filename=' + name, headers: { ...headers, 'Content-Type': 'application/octet-stream' }, payload: png });
@@ -101,7 +103,7 @@ test('real Python worker against local fake Comfy: text generation, ordered mult
   }
   const request = (index: number, operation: string, refs: string[] = []) => {
     const model = models[index], p = model.profiles[0];
-    return { requestId: crypto.randomUUID(), projectId: project.id, operation, input: { modelId: model.id, profileId: p.profileId, workflowRevision: p.workflowRevision,
+    return { requestId: crypto.randomUUID(), projectId: project.id, nodeId: 'result-target', operation, input: { modelId: model.id, profileId: p.profileId, workflowRevision: p.workflowRevision,
       prompt: '测试画面', negativePrompt: '', seed: 7, steps: 2, outputFormat: 'png', referenceAssetIds: refs, ...(operation === 'image.generate.v1' ? { width: 256, height: 256 } : {}) } };
   };
   for (const body of [request(0, 'image.generate.v1'), request(1, 'image.reference.v1', [assets[1].id, assets[0].id])]) {
@@ -109,6 +111,7 @@ test('real Python worker against local fake Comfy: text generation, ordered mult
     assert.equal((await call('/jobs', body)).id, job.id);
     const done = await wait(() => call('/jobs/' + job.id), j => ['succeeded', 'failed'].includes(j.status));
     assert.equal(done.status, 'succeeded', JSON.stringify(done) + log);
+    await assertNodeResult(app,headers,project.id,done,'image');
     const result = await call('/assets/' + done.outputAssetId);
     assert.equal(result.kind, 'image');
     assert.deepEqual(result.provenance.sourceAssetIds, body.input.referenceAssetIds);

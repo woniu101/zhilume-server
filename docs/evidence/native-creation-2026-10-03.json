@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "client": "Windows packaged Studio and Server",
+  "jobs": [
+    {
+      "id": "291762ca-d204-40d1-a067-d6a440fd764f",
+      "nodeId": "audio",
+      "operation": "audio.speech.v1",
+      "status": "succeeded"
+    },
+    {
+      "id": "74f2f236-0792-46a8-bd82-414fb6c561b2",
+      "nodeId": "video",
+      "operation": "video.generate.v1",
+      "status": "succeeded"
+    },
+    {
+      "id": "e6d2103a-3f3f-40fb-a295-2838db4f270f",
+      "nodeId": "image",
+      "operation": "image.generate.v1",
+      "status": "succeeded"
+    },
+    {
+      "id": "13907998-9277-400a-bf6e-eb255ccf29c9",
+      "nodeId": "text",
+      "operation": "text.generate.v1",
+      "status": "succeeded"
+    }
+  ],
+  "canvasSaved": true,
+  "results": 4,
+  "studioVersion": "0.20.0",
+  "serverVersion": "0.15.0",
+  "workerVersion": "0.12.1",
+  "projectReopened": true,
+  "videoPlayedSeconds": 5.16,
+  "audioPlayedSeconds": 3.27,
+  "uiDriver": "Windows native Computer Use",
+  "fixtureResponses": false
+}

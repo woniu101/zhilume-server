@@ -1,3 +1,4 @@
+import { createResultNode, assertNodeResult } from './result-helper.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
@@ -49,10 +50,11 @@ class IndexTTS2:
   const models = await wait(() => call('/speech-models'), v => v[0].ready);
   const p = models[0].profiles[0];
   const project = await call('/projects', { name: 'CPU fixture speech transport' });
+  await createResultNode(app,headers,project.id,'audio');
   const uploaded = await app.inject({ method: 'POST', url: '/api/v1/assets/uploads?filename=voice.wav', headers: { ...headers, 'Content-Type': 'application/octet-stream' }, payload: await readFile('tests/fixtures/interaction-test.wav') });
   assert.equal(uploaded.statusCode, 201);
   const asset = uploaded.json();
-  const request = (text: string) => ({ requestId: crypto.randomUUID(), projectId: project.id, operation: 'audio.speech.v1', input: {
+  const request = (text: string) => ({ requestId: crypto.randomUUID(), projectId: project.id, nodeId: 'result-target', operation: 'audio.speech.v1', input: {
     modelId: p.modelId, profileId: p.profileId, workflowRevision: p.workflowRevision, text, language: 'ZH', speed: 1.25,
     speaker: { assetId: asset.id, start: 0, end: 1.5 }, emotionMode: 'reference', emotionAlpha: .5,
     emotionReference: { assetId: asset.id, start: .5, end: 2 }, emotionVector: Array(8).fill(0), emotionText: '' } });
@@ -60,6 +62,7 @@ class IndexTTS2:
   assert.equal((await call('/jobs', body)).id, job.id);
   const done = await wait(() => call('/jobs/' + job.id), j => ['failed', 'succeeded'].includes(j.status));
   assert.equal(done.status, 'succeeded', JSON.stringify(done));
+  await assertNodeResult(app,headers,project.id,done,'audio');
   const output = await call('/assets/' + done.outputAssetId);
   assert.equal(output.kind, 'audio'); assert.match(output.filename, /\.wav$/);
   assert.deepEqual(output.provenance.sourceAssetIds, [asset.id]);

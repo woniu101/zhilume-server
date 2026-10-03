@@ -1,3 +1,4 @@
+import { createResultNode, assertNodeResult } from './result-helper.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
@@ -51,10 +52,11 @@ test('H3 transport: explicit references, MP4 archive, cancellation and recovery 
   const models=await wait(()=>call('/video-models'),v=>v.every((m:any)=>m.ready));
   const project=await call('/projects',{name:'H3 CPU fixture'});
   const upload=await app.inject({method:'POST',url:'/api/v1/assets/uploads?filename=ref.png',headers:{...headers,'Content-Type':'application/octet-stream'},payload:png});assert.equal(upload.statusCode,201);const asset=upload.json();
-  const body=(reference=false)=>{const p=models[reference?1:0].profiles[0];return {requestId:crypto.randomUUID(),projectId:project.id,operation:'video.generate.v1',input:{modelId:p.modelId,profileId:p.profileId,workflowRevision:p.workflowRevision,mode:reference?'reference':'text',prompt:'A blue sphere',width:512,height:288,frames:124,steps:20,seed:0,includeAudio:false,references:reference?[{role:'image',assetId:asset.id}]:[]}};};
+  await createResultNode(app,headers,project.id,'video');
+  const body=(reference=false)=>{const p=models[reference?1:0].profiles[0];return {requestId:crypto.randomUUID(),projectId:project.id,nodeId:'result-target',operation:'video.generate.v1',input:{modelId:p.modelId,profileId:p.profileId,workflowRevision:p.workflowRevision,mode:reference?'reference':'text',prompt:'A blue sphere',width:512,height:288,frames:124,steps:20,seed:0,includeAudio:false,references:reference?[{role:'image',assetId:asset.id}]:[]}};};
   for(const reference of [false,true]){
     const b=body(reference),job=await call('/jobs',b);assert.equal((await call('/jobs',b)).id,job.id);
-    const done=await wait(()=>call('/jobs/'+job.id),j=>['succeeded','failed'].includes(j.status));assert.equal(done.status,'succeeded',JSON.stringify(done));
+    const done=await wait(()=>call('/jobs/'+job.id),j=>['succeeded','failed'].includes(j.status));assert.equal(done.status,'succeeded',JSON.stringify(done));await assertNodeResult(app,headers,project.id,done,'video');
     const result=await call('/assets/'+done.outputAssetId);assert.equal(result.kind,'video');assert.deepEqual(result.provenance.sourceAssetIds,reference?[asset.id]:[]);assert.equal(result.provenance.parameters.frames,124);
   }
   assert.equal(graphs[1].prompt.condition.inputs['ref_images.ref_image_1'][0],'reference_0');

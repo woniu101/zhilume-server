@@ -113,10 +113,14 @@ export async function createApp(options: Options) {
       }),
     );
   };
-  const saveJob = (job: any) => {
+  // All execution backends persist the job and its node result together.
+  const recordJob = (job: any) => {
     job.updatedAt = now();
     store.put("job", job);
     archiveNodeResult(store, job);
+  };
+  const saveJob = (job: any) => {
+    recordJob(job);
     emit("job.changed", { id: job.id });
     return job;
   };
@@ -1047,7 +1051,7 @@ export async function createApp(options: Options) {
               outputAssetId: a.id,
               ...(outputText !== undefined ? { outputText } : {}),
             });
-            store.put("job", j);
+            recordJob(j);
           });
           emit("job.changed", { id: j.id });
           send(workerId, "task.commit_ack", { status: "succeeded" }, j);
