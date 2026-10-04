@@ -187,3 +187,13 @@ Worker 协议仍为 3.0，以下版本只用于 Studio 对 Server 的控制连�
 - `POST /api/v1/session/revoke`：提交 refreshToken，撤销该设备续期授权及关联访问会话。重复撤销返回成功。
 
 会话密钥不可放入 URL 或日志；Studio 桌面端通过 OS 加密保存，浏览器端仅在标签会话中保存。离线忘记连接只能移除本机保存信息，远端授权在可访问时撤销或自然过期。
+
+## Studio 3.2 素材目录
+
+配套 Studio 0.22.0 / Server 0.16.0；`/system.protocolVersion` 为 3.2。Worker 信封仍为 3.0。
+
+- `POST /api/v1/assets/query`：鉴权；`{source: "service" | "canvas" | "library", projectId?, assetIds?, kinds?, q?, limit?, cursor?}`。画布来源传当前内容 ID，最多 10,000；项目来源要求有效项目。类型默认为全部，名称最大 200 字。返回 `{items, nextCursor}`，默认 24、最大 100 条，无整库总数计算。
+- 游标为不透明值，绑定来源、项目、类型、关键词、画布 ID 集合与页大小。后续页严格早于前页最后一项；条件变化须丢弃游标，新上传不会插入翻页序列。无匹配返回空数组；非法参数/游标为 400。
+- `POST /api/v1/assets/resolve`：鉴权；`{ids: string[]}`，最多 512，去重并跳过缺失或暂存素材；返回已发布素材数组，用于当前内容、草稿和历史引用。更大集合由客户端分批。
+- 查询与解析均不返回存储路径或 Worker/attempt 内部字段，媒体继续使用有时限的签名 URL。原 GET `/assets` 仍作为完整目录枚举接口供管理/诊断调用；Studio 工作区不再轮询该接口。
+- 新入库媒体附带 `metadata: {status: "ready" | "unavailable", width?, height?, duration?}`；duration 单位秒。字段由 Server 探测，不采信上传方声明。文本无需此字段；缺失/不可用不阻止保存与后续预览。

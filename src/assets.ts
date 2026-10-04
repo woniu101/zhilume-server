@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { AppError, id, now } from "./domain.js";
 import type { Store } from "./store.js";
+import { assetMetadata } from './asset-metadata.js';
 
 const types: Record<string, [string, string]> = {
   ".png": ["image", "image/png"],
@@ -142,6 +143,7 @@ export class Assets {
         storageKey,
         createdAt: now(),
         ...extra,
+        metadata: await assetMetadata(final, type[0]),
       });
     } catch (error) {
       await rm(temporary, { force: true });

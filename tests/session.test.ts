@@ -10,7 +10,7 @@ test('server identity survives restart; renewable sessions rotate once and revok
   let app=await createApp({root,token:'fixture-secret'});
   try {
     const identity=(await app.inject({method:'GET',url:'/api/v1/system'})).json();
-    assert.equal(identity.protocolVersion,'3.1');assert.ok(identity.serverId);
+    assert.equal(identity.protocolVersion,'3.2');assert.ok(identity.serverId);
     const response=await app.inject({method:'POST',url:'/api/v1/session',payload:{token:'fixture-secret'}});
     assert.equal(response.statusCode,200);const first=response.json();
     const status=(token:string)=>app.inject({method:'GET',url:'/api/v1/session/status',headers:{authorization:'Bearer '+token}});

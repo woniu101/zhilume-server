@@ -2,9 +2,9 @@
 
 管理台、终端凭证、云端连接和多协议模型接入见 [使用说明](docs/admin-quickstart.md)。最新 EXE：`release/win-unpacked/Zhilume Server.exe`。
 
-独立服务、Web 管理台与 Windows 启动器。当前 0.15.0 初版，配套 Studio 0.21.0；Worker 本轮未修改。支持 H3 视频、IndexTTS 语音及图片任务调度、CPU 媒体处理和模拟能力。上海二 A 5090 的真实 Qwen 2512 / 2.1 图片执行与 Server 主动连接链路已完成样本验收，见 [云端报告](docs/cloud-acceptance-2026-09-26.md)。
+独立服务、Web 管理台与 Windows 启动器。当前 0.16.0 初版，配套 Studio 0.22.0；Worker 本轮未修改。支持 H3 视频、IndexTTS 语音及图片任务调度、CPU 媒体处理和模拟能力。上海二 A 5090 的真实 Qwen 2512 / 2.1 图片执行与 Server 主动连接链路已完成样本验收，见 [云端报告](docs/cloud-acceptance-2026-09-26.md)。
 
-本轮修复 Worker 完成事务漏写节点结果账本，图片、视频、语音及语言生成统一归档。当前功能和验收状态见 [能力矩阵](docs/creation-capability-matrix.md)。
+本轮增加素材来源查询、服务端游标分页、按 ID 解析及入库元信息探测。Studio 控制协议为 3.2；Worker 不变。当前功能和验收状态见 [能力矩阵](docs/creation-capability-matrix.md)。
 
 - `/api/v1/image-models` 返回 Qwen 2512 / 2.1 目录及在线执行配置；未显式启用图片 Worker 时不能提交 GPU 任务。
 - 调度按模型、配置指纹、工作流版本和操作匹配，保留多图顺序与结果 provenance。

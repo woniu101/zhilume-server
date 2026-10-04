@@ -35,6 +35,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS records (kind TEXT NOT NULL, id TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(kind,id));
       INSERT OR IGNORE INTO meta VALUES ('schema_version','1');`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS library_project_asset ON records(json_extract(value,'$.projectId'),json_extract(value,'$.assetId')) WHERE kind='library';`);
     if (
       this.db
         .prepare("SELECT value FROM meta WHERE key=?")

@@ -20,6 +20,7 @@ import { workerStatus } from "./worker-status.js";
 import { ServerMediaQueue } from './media-queue.js';
 import { Store } from "./store.js";
 import { Assets } from "./assets.js";
+import { queryAssets, assetIds } from './asset-query.js';
 import {
   AppError,
   id,
@@ -193,7 +194,7 @@ export async function createApp(options: Options) {
     serverId: identity.serverId,
     name: "Zhilume Server",
     version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version,
-    protocolVersion: "3.1",
+    protocolVersion: "3.2",
     authentication: true,
   }));
   const loginAttempts = new Map<string, { count: number; until: number }>();
@@ -359,6 +360,15 @@ export async function createApp(options: Options) {
       .all("asset")
       .filter((a) => !a.staged)
       .map(publicAsset);
+  });
+  app.post('/api/v1/assets/query', async (req: any) => {
+    owner(req);
+    const page = queryAssets(store, req.body);
+    return { ...page, items: page.items.map(publicAsset) };
+  });
+  app.post('/api/v1/assets/resolve', async (req: any) => {
+    owner(req);
+    return assetIds(req.body?.ids).map(id => store.get('asset', id)).filter(a => a && !a.staged).map(publicAsset);
   });
   app.get("/api/v1/assets/:id", async (req: any) => {
     owner(req);
